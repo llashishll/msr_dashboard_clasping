@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <base target="_top">
+    <title>Satsang Dashboard by Day</title>
+    <?
+      // Define global variables for special satsangs
+      var _specialData = typeof specialData !== 'undefined' ? specialData : null;
+      var _headers = typeof specialEventTableHeaders !== 'undefined' ? specialEventTableHeaders : null;
+      var _keys = typeof specialEventTableKeys !== 'undefined' ? specialEventTableKeys : null;
+      var _displayMonth = selectedMonth;
+      try { 
+        var parts = selectedMonth.split('-'); 
+        var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); 
+        _displayMonth = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); 
+      } catch(e) {}
+    ?>
+    <style>
+      /* Modern Color Scheme and Base Styles */
+      :root {
+        --primary-color: #0000FF;
+        --secondary-color: #0000CD;
+        --accent-color: #4169E1;
+        --background-color: #f5f5f5;
+        --text-color: #333;
+        --border-color: #e0e0e0;
+        --success-color: #4CAF50;
+        --error-color: #f44336;
+        --tab-active-bg: #fff;
+        --tab-inactive-bg: #f0f0f0;
+      }
+
+      body { 
+        font-family: 'Segoe UI', Arial, sans-serif; 
+        font-size: 13px; 
+        margin: 0;
+        padding: 20px;
+        background-color: var(--background-color);
+        color: var(--text-color);
+      }
+
+      /* Header Styles */
+      h1 { 
+        color: var(--primary-color);
+        margin-bottom: 20px;
+        font-size: 24px;
+        font-weight: 500;
+      }
+
+      h2 { 
+        background-color: var(--primary-color);
+        color: white;
+        padding: 12px 20px;
+        margin: 0;
+        border-radius: 4px 4px 0 0;
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      /* Controls Section */
+      .controls {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        flex-wrap: wrap;
+      }
+
+      .controls label {
+        font-weight: 500;
+        color: var(--text-color);
+      }
+
+      .controls select {
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        font-size: 13px;
+        min-width: 150px;
+      }
+
+      .controls button {
+        padding: 8px 16px;
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background-color 0.3s;
+      }
+
+      .controls button:hover {
+        background-color: var(--secondary-color);
+      }
+
+      .controls button:disabled {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+
+      /* Tab Navigation */
+      .tab-navigation {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 20px;
+      }
+
+      .tab-button {
+        padding: 12px 24px;
+        background-color: var(--tab-inactive-bg);
+        border: none;
+        border-radius: 4px 4px 0 0;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-color);
+        transition: all 0.3s;
+      }
+
+      .tab-button.active {
+        background-color: var(--tab-active-bg);
+        color: var(--primary-color);
+        box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+      }
+
+      .tab-button:hover:not(.active) {
+        background-color: #e8e8e8;
+      }
+
+      .tab-content {
+        display: none;
+        background: white;
+        border-radius: 0 4px 4px 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      .tab-content.active {
+        display: block;
+      }
+
+      /* Table Styles */
+      .table-container {
+        overflow-x: auto;
+        margin: 0;
+        padding: 0;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 0;
+        background: white;
+      }
+
+      th, td {
+        border: 1px solid var(--border-color);
+        padding: 8px 12px;
+        text-align: center;
+        vertical-align: middle;
+      }
+
+      th {
+        background-color: #f8f9fa;
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      /* Date Separator - Updated to only show before Total Sangat */
+      .date-separator {
+        border-left: 3px solid var(--primary-color);
+      }
+
+      /* Sticky Headers */
+      .date-header {
+        background-color: var(--primary-color);
+        color: white;
+        font-weight: 500;
+        position: sticky;
+        top: 0;
+        z-index: 11;
+      }
+
+      .sub-header {
+        background-color: #f8f9fa;
+        position: sticky;
+        top: 40px;
+        z-index: 10;
+      }
+
+      /* Sticky Columns */
+      th.sn-header, td.sn-cell {
+        position: sticky;
+        left: 0;
+        z-index: 12;
+        background-color: white;
+        min-width: 40px;
+      }
+
+      th.avg-header, td.avg-cell {
+        position: sticky;
+        left: 40px;
+        z-index: 12;
+        background-color: white;
+        min-width: 80px;
+      }
+
+      th.centre-header, td.centre-cell {
+        position: sticky;
+        left: 120px;
+        z-index: 12;
+        background-color: white;
+        min-width: 130px;
+      }
+
+      /* Row Styles */
+      tbody tr:nth-child(even) {
+        background-color: #f8f9fa;
+      }
+
+      tbody tr:hover {
+        background-color: #f0f7ff;
+      }
+
+      /* Status Messages */
+      .status-message {
+        padding: 8px 12px;
+        border-radius: 4px;
+        margin: 10px 0;
+      }
+
+      .status-error {
+        background-color: #ffebee;
+        color: var(--error-color);
+      }
+
+      .status-success {
+        background-color: #e8f5e9;
+        color: var(--success-color);
+      }
+
+      /* Missing Data Highlight */
+      .missing-data {
+        color: var(--error-color);
+        font-weight: 500;
+      }
+
+      /* No Data Message */
+      .no-data {
+        padding: 20px;
+        text-align: center;
+        color: #666;
+        font-style: italic;
+      }
+    </style>
+</head>
+<body>
+    <h1>Satsang Report by Day</h1>
+
+    <!-- Controls -->
+    <div class="controls">
+        <label for="monthSelector">Select Month:</label>
+        <select id="monthSelector">
+            <? if (availableMonths && availableMonths.length > 0) { ?> <? availableMonths.forEach(month => { var displayMonth = month; try { var parts = month.split('-'); var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); } catch(e) {} ?> <option value="<?= month ?>" <?= month === selectedMonth ? 'selected' : '' ?>><?!= displayMonth ?></option> <? }) ?> <? } else if (selectedMonth) { ?> <? var displayMonth = selectedMonth; try { var parts = selectedMonth.split('-'); var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); } catch(e) {} ?> <option value="<?= selectedMonth ?>" selected><?!= displayMonth ?> (No Data)</option> <? } else { ?> <option value="" disabled selected>-- No Months Available --</option> <? } ?>
+        </select>
+        <button id="exportButton" <?!= !selectedMonth ? 'disabled' : '' ?>>Export Avg Sangat</button>
+        <button id="copyMissingButton" <?!= !selectedMonth ? 'disabled' : '' ?>>Copy Missing Dates</button>
+        <button id="exportCompleteButton">Export Complete Report</button>
+        <span id="exportStatus"></span>
+        <span id="copyStatus"></span>
+        <span id="exportCompleteStatus"></span>
+    </div>
+
+    <? if (error) { ?>
+        <div class="status-message status-error">Error loading dashboard: <?= error ?></div>
+    <? } else if (!selectedMonth) { ?>
+        <div class="status-message">Please select a month, or add data to the sheet.</div>
+    <? } else { ?>
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="sunday">Sunday Satsangs</button>
+            <button class="tab-button" data-tab="wednesday">Wednesday Satsangs</button>
+            <button class="tab-button" data-tab="special">Special Satsangs</button>
+        </div>
+
+        <? function generatePivotedTable(title, data, sortedDates, eventDetailHeaders, eventDetailKeys, selectedMonth) { ?>
+            <? if (!data || !data.templateData || data.templateData.length === 0) { ?>
+                <? var displayMonth = selectedMonth; try { var parts = selectedMonth.split('-'); var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); displayMonth = date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }); } catch(e) {} ?>
+                <div class="no-data">No <?= title.toLowerCase() ?> data available for <?= displayMonth ?>.</div>
+            <? } else { ?>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sn-header" rowspan="2">S.N.</th>
+                                <th class="avg-header" rowspan="2">Avg Sangat</th>
+                                <th class="centre-header" rowspan="2">Centre/Subcentre</th>
+                                <? if (sortedDates && sortedDates.length > 0) { ?>
+                                    <? for (var i = 0; i < sortedDates.length; i++) { ?>
+                                        <th class="date-header" colspan="<?= eventDetailHeaders.length ?>"><?= sortedDates[i] ?></th>
+                                    <? } ?>
+                                <? } ?>
+                            </tr>
+                            <tr>
+                                <? if (sortedDates && sortedDates.length > 0) { ?>
+                                    <? for (var d = 0; d < sortedDates.length; d++) { ?>
+                                        <? for (var c = 0; c < eventDetailHeaders.length; c++) { ?>
+                                            <th class="sub-header"><?= eventDetailHeaders[c] ?></th>
+                                        <? } ?>
+                                    <? } ?>
+                                <? } ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <? for (var i = 0; i < data.templateData.length; i++) { var centreRow = data.templateData[i]; ?>
+                                <tr>
+                                    <td class="sn-cell"><?= i + 1 ?></td>
+                                    <td class="avg-cell"><?= centreRow.averageSangat ?></td>
+                                    <td class="centre-cell <?= centreRow.isBold ? 'bold-centre' : '' ?><?= centreRow.isMissingData ? ' missing-data' : '' ?>"><?= centreRow.centre ?></td>
+                                    <? if (sortedDates && sortedDates.length > 0) { ?>
+                                        <? for (var d = 0; d < sortedDates.length; d++) { 
+                                            var dateKey = sortedDates[d];
+                                            var eventDataForDate = centreRow.dateData[dateKey] || {};
+                                        ?>
+                                            <? eventDetailKeys.forEach((colKey, index) => {
+                                                var displayValue = eventDataForDate[colKey];
+                                                displayValue = (displayValue === null || displayValue === undefined) ? '' : displayValue;
+                                                // Add separator at the start of Total Sangat column
+                                                var     [
+                                                y6hg] = eventDetailHeaders[index] === 'Total Sangat';
+                                            ?>
+                                                <td class="<?= isTotalSangatColumn ? 'date-separator' : '' ?>"><?= displayValue ?></td>
+                                            <? }); ?>
+                                        <? } ?>
+                                    <? } ?>
+                                </tr>
+                            <? } ?>
+                        </tbody>
+                    </table>
+                </div>
+            <? } ?>
+        <? } ?>
+
+        <!-- Sunday Satsangs Tab -->
+        <div id="sunday" class="tab-content active">
+            <? generatePivotedTable('Sunday Satsangs', sundayData, sundayData ? sundayData.sortedDates : [], eventDetailHeaders, eventDetailKeys, selectedMonth); ?>
+        </div>
+
+        <!-- Wednesday Satsangs Tab -->
+        <div id="wednesday" class="tab-content">
+            <? if (wednesdayData && wednesdayData.sortedDates && wednesdayData.sortedDates.length > 0) {
+                var staticWednesdayCenters = [
+                    "ALWAR", "ALWAR-2", "BEHROR", "BHIWADI", "CHIKANI", "FATEHPUR", "GOBINDGARH",
+                    "HALDEENA", "HAZIPUR", "JHALATALA", "KARANA", "KARNIKOT", "KHAIRTHAL",
+                    "KISHANGARH BAS", "LAXMANGARH", "MUBARIKPUR", "PAWTI", "PEPEAL KHERA",
+                    "RAJGARH", "RAMGARH", "RATA KHURD", "SHAJHANPUR"
+                ];
+            ?>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sn-header" rowspan="2">S.N.</th>
+                                <th class="avg-header" rowspan="2">Avg Sangat</th>
+                                <th class="centre-header" rowspan="2">Centre/Subcentre</th>
+                                <? for (var i = 0; i < wednesdayData.sortedDates.length; i++) { ?>
+                                    <th class="date-header" colspan="<?= eventDetailHeaders.length ?>"><?= wednesdayData.sortedDates[i] ?></th>
+                                <? } ?>
+                            </tr>
+                            <tr>
+                                <? for (var d = 0; d < wednesdayData.sortedDates.length; d++) { ?>
+                                    <? for (var c = 0; c < eventDetailHeaders.length; c++) { ?>
+                                        <th class="sub-header"><?= eventDetailHeaders[c] ?></th>
+                                    <? } ?>
+                                <? } ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <? for (var i = 0; i < staticWednesdayCenters.length; i++) {
+                                var centreName = staticWednesdayCenters[i];
+                                var centreRow = (wednesdayData.templateData || []).find(function(row) { return row.centre === centreName; });
+                                var isMissing = false;
+                                if (!centreRow) {
+                                    isMissing = true;
+                                } else {
+                                    for (var d = 0; d < wednesdayData.sortedDates.length; d++) {
+                                        var dateKey = wednesdayData.sortedDates[d];
+                                        if (!centreRow.dateData[dateKey]) {
+                                            isMissing = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            ?>
+                                <tr>
+                                    <td class="sn-cell"><?= i + 1 ?></td>
+                                    <td class="avg-cell"><?= !centreRow ? '' : centreRow.averageSangat ?></td>
+                                    <td class="centre-cell<?= isMissing ? ' missing-data' : (centreRow && centreRow.isBold ? ' bold-centre' : '') ?>"><?= centreName ?></td>
+                                    <? for (var d = 0; d < wednesdayData.sortedDates.length; d++) {
+                                        var dateKey = wednesdayData.sortedDates[d];
+                                        var eventDataForDate = !centreRow ? {} : (centreRow.dateData[dateKey] || {});
+                                        eventDetailKeys.forEach(function(colKey, index) {
+                                            var displayValue = eventDataForDate[colKey];
+                                            displayValue = (displayValue === null || displayValue === undefined) ? '' : displayValue;
+                                            // Add separator only before Total Sangat column
+                                            var isTotalSangatColumn = eventDetailHeaders[index] === 'Total Sangat';
+                                    ?>
+                                        <td class="<?= isTotalSangatColumn ? 'date-separator' : '' ?>"><?= displayValue ?></td>
+                                    <? }); } ?>
+                                </tr>
+                            <? } ?>
+                        </tbody>
+                    </table>
+                </div>
+            <? } else { ?>
+                <div class="no-data">No Wednesday satsang data available for <?= selectedMonth ?>.</div>
+            <? } ?>
+        </div>
+
+        <!-- Special Satsangs Tab -->
+        <div id="special" class="tab-content">
+            <? if (!_specialData || _specialData.length === 0) { ?>
+                <div class="no-data">No special satsang data available for <?= _displayMonth ?>.</div>
+            <? } else if (!_headers || _headers.length === 0 || !_keys || _keys.length === 0) { ?>
+                <div class="status-message status-error">Error: Special Satsang table configuration is missing. Cannot display data.</div>
+            <? } else { ?>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <? _headers.forEach(header => { ?>
+                                    <th><?= header ?></th>
+                                <? }); ?>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <? _specialData.forEach(event => { ?>
+                                <tr>
+                                    <? _keys.forEach(key => {
+                                        var displayValue = event[key];
+                                        displayValue = (displayValue === null || displayValue === undefined) ? '' : displayValue;
+                                    ?>
+                                        <td><?= displayValue ?></td>
+                                    <? }); ?>
+                                </tr>
+                            <? }); ?>
+                        </tbody>
+                    </table>
+                </div>
+            <? } ?>
+        </div>
+    <? } ?>
+
+    <script>
+      // Tab Navigation
+      document.querySelectorAll('.tab-button').forEach(button => {
+        button.addEventListener('click', () => {
+          // Remove active class from all buttons and contents
+          document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+          document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+          
+          // Add active class to clicked button and corresponding content
+          button.classList.add('active');
+          document.getElementById(button.dataset.tab).classList.add('active');
+        });
+      });
+
+      // Month selector functionality
+      document.getElementById('monthSelector').addEventListener('change', function() {
+        var newMonth = this.value;
+        if (newMonth) {
+          var currentUrl = new URL(window.location.href);
+          var params = currentUrl.searchParams;
+          params.set('month', newMonth);
+          params.delete('sundaySort');
+          currentUrl.search = params.toString();
+          window.location.href = currentUrl.toString();
+        }
+      });
+
+      // Copy missing Dates button functionality
+      document.getElementById('copyMissingButton').addEventListener('click', function() {
+        var statusSpan = document.getElementById('copyStatus');
+        var copyButton = this;
+        
+        statusSpan.textContent = 'Finding missing date entries...';
+        statusSpan.className = 'status-message';
+        copyButton.disabled = true;
+        
+        google.script.run
+          .withSuccessHandler(function(missingEntries) {
+            if (missingEntries && missingEntries.length > 0) {
+              var sundayLines = [];
+              var wednesdayLines = [];
+              missingEntries.forEach(function(line) {
+                if (line.includes('(Sunday):')) {
+                  sundayLines.push(line.replace(' (Sunday):', ':'));
+                } else if (line.includes('(Wednesday):')) {
+                  wednesdayLines.push(line.replace(' (Wednesday):', ':'));
+                }
+              });
+              var textToCopy = 'Centers with missing date entries:\n\n';
+              if (sundayLines.length > 0) {
+                textToCopy += 'SUNDAY :\n' + sundayLines.join('\n') + '\n';
+              }
+              if (wednesdayLines.length > 0) {
+                textToCopy += '\nWEDNESDAY:\n' + wednesdayLines.join('\n') + '\n';
+              }
+              navigator.clipboard.writeText(textToCopy)
+                .then(() => {
+                  statusSpan.textContent = 'Copied to clipboard!';
+                  statusSpan.className = 'status-message status-success';
+                })
+                .catch(err => {
+                  statusSpan.textContent = 'Failed to copy: ' + err;
+                  statusSpan.className = 'status-message status-error';
+                });
+            } else {
+              statusSpan.textContent = 'No missing date entries found.';
+              statusSpan.className = 'status-message status-success';
+            }
+            copyButton.disabled = false;
+          })
+          .withFailureHandler(function(error) {
+            statusSpan.textContent = 'Error: ' + error.message;
+            statusSpan.className = 'status-message status-error';
+            copyButton.disabled = false;
+          })
+          .findMissingDateEntries('<?= selectedMonth ?>');
+      });
+
+      // Export button functionality
+      function handleExport(buttonId, statusId, exportFunction) {
+        const button = document.getElementById(buttonId);
+        const statusSpan = document.getElementById(statusId);
+        const selectedMonth = '<?= selectedMonth ?>';
+        
+        if (!selectedMonth) {
+          statusSpan.textContent = 'Error: No month selected.';
+          statusSpan.className = 'status-message status-error';
+          return;
+        }
+        
+        statusSpan.textContent = 'Validating and cleaning data...';
+        statusSpan.className = 'status-message';
+        button.disabled = true;
+        
+        // Add a timeout to prevent hanging
+        const timeoutId = setTimeout(() => {
+          statusSpan.textContent = 'Export is taking longer than expected. Please try again.';
+          statusSpan.className = 'status-message status-error';
+          button.disabled = false;
+        }, 30000); // 30 second timeout
+        
+        // First validate and clean the data
+        google.script.run
+          .withSuccessHandler(function(validationResult) {
+            if (validationResult && validationResult.hasIssues) {
+              clearTimeout(timeoutId);
+              let errorMessage = 'Data validation found issues:\n\n';
+              if (validationResult.specialChars) {
+                errorMessage += 'Special characters found in:\n' + validationResult.specialChars.join('\n') + '\n\n';
+              }
+              if (validationResult.largeNumbers) {
+                errorMessage += 'Very large numbers found in:\n' + validationResult.largeNumbers.join('\n') + '\n\n';
+              }
+              if (validationResult.formattedCells) {
+                errorMessage += 'Cells with unusual formatting in:\n' + validationResult.formattedCells.join('\n') + '\n\n';
+              }
+              errorMessage += 'Please clean these issues and try again.';
+              statusSpan.textContent = errorMessage;
+              statusSpan.className = 'status-message status-error';
+              button.disabled = false;
+            } else {
+              // If data is clean, proceed with export
+              performExport();
+            }
+          })
+          .withFailureHandler(function(error) {
+            clearTimeout(timeoutId);
+            statusSpan.textContent = 'Error validating data: ' + error.message;
+            statusSpan.className = 'status-message status-error';
+            button.disabled = false;
+          })
+          .validateAndCleanData(selectedMonth);
+          
+        function performExport() {
+          google.script.run
+            .withSuccessHandler(function(result) {
+              clearTimeout(timeoutId);
+              if (result && result.error) {
+                let errorMessage = 'Export failed: ';
+                if (result.error.includes('invalid data')) {
+                  errorMessage = 'Some data in the spreadsheet is causing issues. Please check for:\n' +
+                               '1. Special characters or invalid formatting\n' +
+                               '2. Very large numbers or text\n' +
+                               '3. Empty cells with formatting\n' +
+                               'Try cleaning the data and exporting again.';
+                } else {
+                  errorMessage += result.error;
+                }
+                statusSpan.textContent = errorMessage;
+                statusSpan.className = 'status-message status-error';
+              } else if (result && result.downloadUrl && typeof result.downloadUrl === 'string' && result.downloadUrl.startsWith('http')) {
+                statusSpan.textContent = 'Export successful!';
+                statusSpan.className = 'status-message status-success';
+                
+                const link = document.createElement('a');
+                link.href = result.downloadUrl;
+                link.target = '_blank';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                setTimeout(() => {
+                  statusSpan.textContent = '';
+                  statusSpan.className = '';
+                }, 7000);
+              } else {
+                statusSpan.textContent = 'Export failed. Please try exporting a smaller range of data.';
+                statusSpan.className = 'status-message status-error';
+                console.error('Export failed, response:', result);
+              }
+              button.disabled = false;
+            })
+            .withFailureHandler(function(error) {
+              clearTimeout(timeoutId);
+              let errorMessage = 'Export failed: ';
+              
+              if (error.message.includes('Service Spreadsheets failed')) {
+                errorMessage = 'Data processing error. Please check for:\n' +
+                             '1. Invalid characters in the data\n' +
+                             '2. Cells with unusual formatting\n' +
+                             '3. Very large numbers or text\n' +
+                             'Try cleaning the data and exporting again.';
+              } else if (error.message.includes('timed out')) {
+                errorMessage = 'The data is too large to process. Please try exporting a smaller range.';
+              } else if (error.message.includes('permission')) {
+                errorMessage = 'Permission denied. Please check your Google account permissions and try again.';
+              } else {
+                errorMessage += error.message;
+              }
+              
+              statusSpan.textContent = errorMessage;
+              statusSpan.className = 'status-message status-error';
+              console.error('Export Error:', error);
+              button.disabled = false;
+            })
+            [exportFunction](selectedMonth);
+        }
+      }
+
+      // Add error handling for script loading
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        console.error('Script Error:', msg, 'at', url, ':', lineNo);
+        return false;
+      };
+
+      document.getElementById('exportButton').addEventListener('click', () => 
+        handleExport('exportButton', 'exportStatus', 'exportFilteredDataToExcel'));
+      
+      document.getElementById('exportCompleteButton').addEventListener('click', () => 
+        handleExport('exportCompleteButton', 'exportCompleteStatus', 'exportCompleteDataToExcel'));
+    </script>
+</body>
+</html>
