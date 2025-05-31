@@ -18,21 +18,26 @@
     <style>
       /* Modern Color Scheme and Base Styles */
       :root {
-        --primary-color: #0000FF;
-        --secondary-color: #0000CD;
-        --accent-color: #4169E1;
-        --background-color: #f5f5f5;
-        --text-color: #333;
+        --primary-color: #8B0000;
+        --secondary-color: #A52A2A;
+        --accent-color: #B22222;
+        --background-color: #f8f9fa;
+        --text-color: #2c3e50;
         --border-color: #e0e0e0;
         --success-color: #4CAF50;
         --error-color: #f44336;
         --tab-active-bg: #fff;
         --tab-inactive-bg: #f0f0f0;
+        --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+        --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+        --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+        --transition-speed: 0.3s;
       }
 
       body { 
-        font-family: 'Segoe UI', Arial, sans-serif; 
-        font-size: 13px; 
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+        font-size: 14px; 
+        line-height: 1.5;
         margin: 0;
         padding: 20px;
         background-color: var(--background-color);
@@ -42,90 +47,138 @@
       /* Header Styles */
       h1 { 
         color: var(--primary-color);
-        margin-bottom: 20px;
-        font-size: 24px;
-        font-weight: 500;
+        margin-bottom: 24px;
+        font-size: 28px;
+        font-weight: 600;
+        letter-spacing: -0.5px;
       }
 
       h2 { 
         background-color: var(--primary-color);
         color: white;
-        padding: 12px 20px;
+        padding: 16px 24px;
         margin: 0;
-        border-radius: 4px 4px 0 0;
-        font-size: 18px;
+        border-radius: 8px 8px 0 0;
+        font-size: 20px;
         font-weight: 500;
       }
 
       /* Controls Section */
       .controls {
         background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        margin-bottom: 24px;
         display: flex;
         align-items: center;
-        gap: 20px;
+        gap: 16px;
         flex-wrap: wrap;
       }
 
       .controls label {
         font-weight: 500;
         color: var(--text-color);
+        margin-right: 8px;
       }
 
       .controls select {
-        padding: 8px 12px;
+        padding: 10px 16px;
         border: 1px solid var(--border-color);
-        border-radius: 4px;
-        font-size: 13px;
-        min-width: 150px;
+        border-radius: 8px;
+        font-size: 14px;
+        min-width: 180px;
+        background-color: white;
+        cursor: pointer;
+        transition: border-color var(--transition-speed);
+      }
+
+      .controls select:hover {
+        border-color: var(--primary-color);
+      }
+
+      .controls select:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
       }
 
       .controls button {
-        padding: 8px 16px;
+        padding: 10px 20px;
         background-color: var(--primary-color);
         color: white;
         border: none;
-        border-radius: 4px;
+        border-radius: 8px;
         cursor: pointer;
-        font-size: 13px;
-        transition: background-color 0.3s;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all var(--transition-speed);
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .controls button:hover {
         background-color: var(--secondary-color);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-sm);
+      }
+
+      .controls button:active {
+        transform: translateY(0);
       }
 
       .controls button:disabled {
         background-color: #ccc;
         cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+
+      /* Loading Spinner */
+      .loading-spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 2px solid rgba(255,255,255,0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
 
       /* Tab Navigation */
       .tab-navigation {
         display: flex;
-        gap: 4px;
-        margin-bottom: 20px;
+        gap: 8px;
+        margin-bottom: 24px;
+        background: white;
+        padding: 8px;
+        border-radius: 12px;
+        box-shadow: var(--shadow-sm);
       }
 
       .tab-button {
         padding: 12px 24px;
         background-color: var(--tab-inactive-bg);
         border: none;
-        border-radius: 4px 4px 0 0;
+        border-radius: 8px;
         cursor: pointer;
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 500;
         color: var(--text-color);
-        transition: all 0.3s;
+        transition: all var(--transition-speed);
+        flex: 1;
+        text-align: center;
       }
 
       .tab-button.active {
-        background-color: var(--tab-active-bg);
-        color: var(--primary-color);
-        box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
+        background-color: var(--primary-color);
+        color: white;
+        box-shadow: var(--shadow-sm);
       }
 
       .tab-button:hover:not(.active) {
@@ -135,8 +188,14 @@
       .tab-content {
         display: none;
         background: white;
-        border-radius: 0 4px 4px 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-radius: 12px;
+        box-shadow: var(--shadow-md);
+        animation: fadeIn var(--transition-speed);
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
       }
 
       .tab-content.active {
@@ -148,10 +207,13 @@
         overflow-x: auto;
         margin: 0;
         padding: 0;
+        border-radius: 12px;
+        background: white;
       }
 
       table {
-        border-collapse: collapse;
+        border-collapse: separate;
+        border-spacing: 0;
         width: 100%;
         margin: 0;
         background: white;
@@ -159,20 +221,21 @@
 
       th, td {
         border: 1px solid var(--border-color);
-        padding: 8px 12px;
+        padding: 12px 16px;
         text-align: center;
         vertical-align: middle;
       }
 
       th {
         background-color: #f8f9fa;
-        font-weight: 500;
+        font-weight: 600;
         position: sticky;
         top: 0;
         z-index: 10;
+        white-space: nowrap;
       }
 
-      /* Date Separator - Updated to only show before Total Sangat */
+      /* Date Separator */
       .date-separator {
         border-left: 3px solid var(--primary-color);
       }
@@ -230,19 +293,24 @@
 
       /* Status Messages */
       .status-message {
-        padding: 8px 12px;
-        border-radius: 4px;
-        margin: 10px 0;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin: 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .status-error {
         background-color: #ffebee;
         color: var(--error-color);
+        border: 1px solid rgba(244, 67, 54, 0.2);
       }
 
       .status-success {
         background-color: #e8f5e9;
         color: var(--success-color);
+        border: 1px solid rgba(76, 175, 80, 0.2);
       }
 
       /* Missing Data Highlight */
@@ -253,34 +321,165 @@
 
       /* No Data Message */
       .no-data {
-        padding: 20px;
+        padding: 32px;
         text-align: center;
         color: #666;
         font-style: italic;
+        background: white;
+        border-radius: 12px;
+        box-shadow: var(--shadow-sm);
+      }
+
+      /* Loading Overlay */
+      .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        opacity: 0;
+        visibility: hidden;
+        transition: all var(--transition-speed);
+      }
+
+      .loading-overlay.active {
+        opacity: 1;
+        visibility: visible;
+      }
+
+      .loading-content {
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: var(--shadow-lg);
+        text-align: center;
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        body {
+          padding: 12px;
+        }
+
+        .controls {
+          padding: 16px;
+          gap: 12px;
+        }
+
+        .controls select,
+        .controls button {
+          width: 100%;
+        }
+
+        .tab-button {
+          padding: 10px 16px;
+          font-size: 14px;
+        }
+
+        th, td {
+          padding: 8px 12px;
+          font-size: 13px;
+        }
+      }
+
+      /* Print Styles */
+      @media print {
+        body {
+          padding: 0;
+          background: white;
+        }
+
+        .controls,
+        .tab-navigation {
+          display: none;
+        }
+
+        .table-container {
+          box-shadow: none;
+        }
+
+        table {
+          border-collapse: collapse;
+        }
+
+        th, td {
+          border: 1px solid #000;
+        }
       }
     </style>
 </head>
 <body>
     <h1>Satsang Report by Day</h1>
 
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <p>Loading data...</p>
+        </div>
+    </div>
+
     <!-- Controls -->
     <div class="controls">
         <label for="monthSelector">Select Month:</label>
         <select id="monthSelector">
-            <? if (availableMonths && availableMonths.length > 0) { ?> <? availableMonths.forEach(month => { var displayMonth = month; try { var parts = month.split('-'); var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); } catch(e) {} ?> <option value="<?= month ?>" <?= month === selectedMonth ? 'selected' : '' ?>><?!= displayMonth ?></option> <? }) ?> <? } else if (selectedMonth) { ?> <? var displayMonth = selectedMonth; try { var parts = selectedMonth.split('-'); var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1); displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' }); } catch(e) {} ?> <option value="<?= selectedMonth ?>" selected><?!= displayMonth ?> (No Data)</option> <? } else { ?> <option value="" disabled selected>-- No Months Available --</option> <? } ?>
+            <? if (availableMonths && availableMonths.length > 0) { ?>
+                <? availableMonths.forEach(month => { 
+                    var displayMonth = month;
+                    try {
+                        var parts = month.split('-');
+                        var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+                        displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+                    } catch(e) {}
+                ?>
+                    <option value="<?= month ?>" <?= month === selectedMonth ? 'selected' : '' ?>><?!= displayMonth ?></option>
+                <? }) ?>
+            <? } else if (selectedMonth) { ?>
+                <? var displayMonth = selectedMonth;
+                   try {
+                       var parts = selectedMonth.split('-');
+                       var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+                       displayMonth = date.toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+                   } catch(e) {}
+                ?>
+                    <option value="<?= selectedMonth ?>" selected><?!= displayMonth ?> (No Data)</option>
+            <? } else { ?>
+                <option value="" disabled selected>-- No Months Available --</option>
+            <? } ?>
         </select>
-        <button id="exportButton" <?!= !selectedMonth ? 'disabled' : '' ?>>Export Avg Sangat</button>
-        <button id="copyMissingButton" <?!= !selectedMonth ? 'disabled' : '' ?>>Copy Missing Dates</button>
-        <button id="exportCompleteButton">Export Complete Report</button>
+        <button id="exportButton" <?!= !selectedMonth ? 'disabled' : '' ?>>
+            <span class="button-text">Export Avg Sangat</span>
+        </button>
+        <button id="copyMissingButton" <?!= !selectedMonth ? 'disabled' : '' ?>>
+            <span class="button-text">Copy Missing Dates</span>
+        </button>
+        <button id="exportCompleteButton">
+            <span class="button-text">Export Complete Report</span>
+        </button>
         <span id="exportStatus"></span>
         <span id="copyStatus"></span>
         <span id="exportCompleteStatus"></span>
     </div>
 
     <? if (error) { ?>
-        <div class="status-message status-error">Error loading dashboard: <?= error ?></div>
+        <div class="status-message status-error">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
+            </svg>
+            Error loading dashboard: <?= error ?>
+        </div>
     <? } else if (!selectedMonth) { ?>
-        <div class="status-message">Please select a month, or add data to the sheet.</div>
+        <div class="status-message">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
+            </svg>
+            Please select a month, or add data to the sheet.
+        </div>
     <? } else { ?>
         <!-- Tab Navigation -->
         <div class="tab-navigation">
@@ -332,8 +531,7 @@
                                                 var displayValue = eventDataForDate[colKey];
                                                 displayValue = (displayValue === null || displayValue === undefined) ? '' : displayValue;
                                                 // Add separator at the start of Total Sangat column
-                                                var     [
-                                                y6hg] = eventDetailHeaders[index] === 'Total Sangat';
+                                                var isTotalSangatColumn = eventDetailHeaders[index] === 'Total Sangat';
                                             ?>
                                                 <td class="<?= isTotalSangatColumn ? 'date-separator' : '' ?>"><?= displayValue ?></td>
                                             <? }); ?>
@@ -458,7 +656,39 @@
     <? } ?>
 
     <script>
-      // Tab Navigation
+      // Show loading overlay
+      function showLoading() {
+        document.getElementById('loadingOverlay').classList.add('active');
+      }
+
+      // Hide loading overlay
+      function hideLoading() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+      }
+
+      // Add loading state to buttons
+      function setButtonLoading(buttonId, isLoading) {
+        const button = document.getElementById(buttonId);
+        const buttonText = button.querySelector('.button-text');
+        
+        if (isLoading) {
+          button.disabled = true;
+          buttonText.innerHTML = '<div class="loading-spinner"></div> Loading...';
+        } else {
+          button.disabled = false;
+          buttonText.textContent = buttonText.getAttribute('data-original-text') || buttonText.textContent;
+        }
+      }
+
+      // Store original button text
+      document.querySelectorAll('button').forEach(button => {
+        const buttonText = button.querySelector('.button-text');
+        if (buttonText) {
+          buttonText.setAttribute('data-original-text', buttonText.textContent);
+        }
+      });
+
+      // Tab switching with animation
       document.querySelectorAll('.tab-button').forEach(button => {
         button.addEventListener('click', () => {
           // Remove active class from all buttons and contents
@@ -467,193 +697,104 @@
           
           // Add active class to clicked button and corresponding content
           button.classList.add('active');
-          document.getElementById(button.dataset.tab).classList.add('active');
+          const tabId = button.getAttribute('data-tab');
+          document.getElementById(tabId).classList.add('active');
         });
       });
 
-      // Month selector functionality
+      // Month change handler with loading state
       document.getElementById('monthSelector').addEventListener('change', function() {
-        var newMonth = this.value;
-        if (newMonth) {
-          var currentUrl = new URL(window.location.href);
-          var params = currentUrl.searchParams;
-          params.set('month', newMonth);
-          params.delete('sundaySort');
-          currentUrl.search = params.toString();
-          window.location.href = currentUrl.toString();
-        }
-      });
-
-      // Copy missing Dates button functionality
-      document.getElementById('copyMissingButton').addEventListener('click', function() {
-        var statusSpan = document.getElementById('copyStatus');
-        var copyButton = this;
-        
-        statusSpan.textContent = 'Finding missing date entries...';
-        statusSpan.className = 'status-message';
-        copyButton.disabled = true;
+        showLoading();
+        const selectedMonth = this.value;
         
         google.script.run
-          .withSuccessHandler(function(missingEntries) {
-            if (missingEntries && missingEntries.length > 0) {
-              var sundayLines = [];
-              var wednesdayLines = [];
-              missingEntries.forEach(function(line) {
-                if (line.includes('(Sunday):')) {
-                  sundayLines.push(line.replace(' (Sunday):', ':'));
-                } else if (line.includes('(Wednesday):')) {
-                  wednesdayLines.push(line.replace(' (Wednesday):', ':'));
-                }
-              });
-              var textToCopy = 'Centers with missing date entries:\n\n';
-              if (sundayLines.length > 0) {
-                textToCopy += 'SUNDAY :\n' + sundayLines.join('\n') + '\n';
-              }
-              if (wednesdayLines.length > 0) {
-                textToCopy += '\nWEDNESDAY:\n' + wednesdayLines.join('\n') + '\n';
-              }
-              navigator.clipboard.writeText(textToCopy)
-                .then(() => {
-                  statusSpan.textContent = 'Copied to clipboard!';
-                  statusSpan.className = 'status-message status-success';
-                })
-                .catch(err => {
-                  statusSpan.textContent = 'Failed to copy: ' + err;
-                  statusSpan.className = 'status-message status-error';
-                });
+          .withSuccessHandler(function(result) {
+            hideLoading();
+            if (result.error) {
+              showError(result.error);
             } else {
-              statusSpan.textContent = 'No missing date entries found.';
-              statusSpan.className = 'status-message status-success';
+              location.reload();
             }
-            copyButton.disabled = false;
           })
           .withFailureHandler(function(error) {
-            statusSpan.textContent = 'Error: ' + error.message;
-            statusSpan.className = 'status-message status-error';
-            copyButton.disabled = false;
+            hideLoading();
+            showError('Failed to change month: ' + error.message);
           })
-          .findMissingDateEntries('<?= selectedMonth ?>');
+          .changeMonth(selectedMonth);
       });
 
-      // Export button functionality
+      // Export handlers with loading states
       function handleExport(buttonId, statusId, exportFunction) {
         const button = document.getElementById(buttonId);
         const statusSpan = document.getElementById(statusId);
-        const selectedMonth = '<?= selectedMonth ?>';
+        const selectedMonth = document.getElementById('monthSelector').value;
         
         if (!selectedMonth) {
-          statusSpan.textContent = 'Error: No month selected.';
+          statusSpan.textContent = 'Please select a month first.';
           statusSpan.className = 'status-message status-error';
           return;
         }
-        
-        statusSpan.textContent = 'Validating and cleaning data...';
+
+        setButtonLoading(buttonId, true);
+        statusSpan.textContent = 'Preparing export...';
         statusSpan.className = 'status-message';
-        button.disabled = true;
-        
-        // Add a timeout to prevent hanging
-        const timeoutId = setTimeout(() => {
-          statusSpan.textContent = 'Export is taking longer than expected. Please try again.';
-          statusSpan.className = 'status-message status-error';
-          button.disabled = false;
-        }, 30000); // 30 second timeout
-        
-        // First validate and clean the data
+
         google.script.run
-          .withSuccessHandler(function(validationResult) {
-            if (validationResult && validationResult.hasIssues) {
-              clearTimeout(timeoutId);
-              let errorMessage = 'Data validation found issues:\n\n';
-              if (validationResult.specialChars) {
-                errorMessage += 'Special characters found in:\n' + validationResult.specialChars.join('\n') + '\n\n';
-              }
-              if (validationResult.largeNumbers) {
-                errorMessage += 'Very large numbers found in:\n' + validationResult.largeNumbers.join('\n') + '\n\n';
-              }
-              if (validationResult.formattedCells) {
-                errorMessage += 'Cells with unusual formatting in:\n' + validationResult.formattedCells.join('\n') + '\n\n';
-              }
-              errorMessage += 'Please clean these issues and try again.';
-              statusSpan.textContent = errorMessage;
-              statusSpan.className = 'status-message status-error';
-              button.disabled = false;
+          .withSuccessHandler(function(downloadUrl) {
+            setButtonLoading(buttonId, false);
+            if (downloadUrl) {
+              statusSpan.textContent = 'Export successful! Downloading...';
+              statusSpan.className = 'status-message status-success';
+              window.open(downloadUrl, '_blank');
             } else {
-              // If data is clean, proceed with export
-              performExport();
+              statusSpan.textContent = 'Export completed but no download URL received.';
+              statusSpan.className = 'status-message status-error';
             }
           })
           .withFailureHandler(function(error) {
-            clearTimeout(timeoutId);
-            statusSpan.textContent = 'Error validating data: ' + error.message;
+            setButtonLoading(buttonId, false);
+            let errorMessage = 'Export failed: ';
+            
+            if (error.message.includes('Service Spreadsheets failed')) {
+              errorMessage = 'Data processing error. Please check for:\n' +
+                           '1. Invalid characters in the data\n' +
+                           '2. Cells with unusual formatting\n' +
+                           '3. Very large numbers or text\n' +
+                           'Try cleaning the data and exporting again.';
+            } else if (error.message.includes('timed out')) {
+              errorMessage = 'The data is too large to process. Please try exporting a smaller range.';
+            } else if (error.message.includes('permission')) {
+              errorMessage = 'Permission denied. Please check your Google account permissions and try again.';
+            } else {
+              errorMessage += error.message;
+            }
+            
+            statusSpan.textContent = errorMessage;
             statusSpan.className = 'status-message status-error';
-            button.disabled = false;
+            console.error('Export Error:', error);
           })
-          .validateAndCleanData(selectedMonth);
-          
-        function performExport() {
-          google.script.run
-            .withSuccessHandler(function(result) {
-              clearTimeout(timeoutId);
-              if (result && result.error) {
-                let errorMessage = 'Export failed: ';
-                if (result.error.includes('invalid data')) {
-                  errorMessage = 'Some data in the spreadsheet is causing issues. Please check for:\n' +
-                               '1. Special characters or invalid formatting\n' +
-                               '2. Very large numbers or text\n' +
-                               '3. Empty cells with formatting\n' +
-                               'Try cleaning the data and exporting again.';
-                } else {
-                  errorMessage += result.error;
-                }
-                statusSpan.textContent = errorMessage;
-                statusSpan.className = 'status-message status-error';
-              } else if (result && result.downloadUrl && typeof result.downloadUrl === 'string' && result.downloadUrl.startsWith('http')) {
-                statusSpan.textContent = 'Export successful!';
-                statusSpan.className = 'status-message status-success';
-                
-                const link = document.createElement('a');
-                link.href = result.downloadUrl;
-                link.target = '_blank';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                setTimeout(() => {
-                  statusSpan.textContent = '';
-                  statusSpan.className = '';
-                }, 7000);
-              } else {
-                statusSpan.textContent = 'Export failed. Please try exporting a smaller range of data.';
-                statusSpan.className = 'status-message status-error';
-                console.error('Export failed, response:', result);
-              }
-              button.disabled = false;
-            })
-            .withFailureHandler(function(error) {
-              clearTimeout(timeoutId);
-              let errorMessage = 'Export failed: ';
-              
-              if (error.message.includes('Service Spreadsheets failed')) {
-                errorMessage = 'Data processing error. Please check for:\n' +
-                             '1. Invalid characters in the data\n' +
-                             '2. Cells with unusual formatting\n' +
-                             '3. Very large numbers or text\n' +
-                             'Try cleaning the data and exporting again.';
-              } else if (error.message.includes('timed out')) {
-                errorMessage = 'The data is too large to process. Please try exporting a smaller range.';
-              } else if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please check your Google account permissions and try again.';
-              } else {
-                errorMessage += error.message;
-              }
-              
-              statusSpan.textContent = errorMessage;
-              statusSpan.className = 'status-message status-error';
-              console.error('Export Error:', error);
-              button.disabled = false;
-            })
-            [exportFunction](selectedMonth);
-        }
+          [exportFunction](selectedMonth);
+      }
+
+      // Add event listeners for export buttons
+      document.getElementById('exportButton').addEventListener('click', () => 
+        handleExport('exportButton', 'exportStatus', 'exportFilteredDataToExcel'));
+      
+      document.getElementById('exportCompleteButton').addEventListener('click', () => 
+        handleExport('exportCompleteButton', 'exportCompleteStatus', 'exportCompleteDataToExcel'));
+
+      // Error handling
+      function showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'status-message status-error';
+        errorDiv.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
+          </svg>
+          ${message}
+        `;
+        document.querySelector('.controls').after(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);
       }
 
       // Add error handling for script loading
@@ -661,12 +802,6 @@
         console.error('Script Error:', msg, 'at', url, ':', lineNo);
         return false;
       };
-
-      document.getElementById('exportButton').addEventListener('click', () => 
-        handleExport('exportButton', 'exportStatus', 'exportFilteredDataToExcel'));
-      
-      document.getElementById('exportCompleteButton').addEventListener('click', () => 
-        handleExport('exportCompleteButton', 'exportCompleteStatus', 'exportCompleteDataToExcel'));
     </script>
 </body>
 </html>

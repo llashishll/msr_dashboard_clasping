@@ -378,16 +378,16 @@ function getDataForDashboard(requestedMonth) {
 
     // --- Process Data ---
     const sundayResult = processAndSortData(
-      sundayRows,
+      sundayRows || [], // Ensure we pass an array
       actualSelectedMonth,
       true
     ); // Pivot Sun, isSundayData = true
     const wednesdayResult = processAndSortData(
-      wednesdayRows,
+      wednesdayRows || [], // Ensure we pass an array
       actualSelectedMonth,
       false // Pivot Wed, isSundayData = false
     );
-    const specialResultArray = processSpecialSatsangList(specialRows); // Unpivot Special
+    const specialResultArray = processSpecialSatsangList(specialRows || []); // Ensure we pass an array
 
     return {
       sunday: sundayResult,
