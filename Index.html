@@ -458,11 +458,15 @@
         <button id="copyMissingButton" <?!= !selectedMonth ? 'disabled' : '' ?>>
             <span class="button-text">Copy Missing Dates</span>
         </button>
+        <button id="filterIncompleteButton" <?!= !selectedMonth ? 'disabled' : '' ?>>
+            <span class="button-text">Show Incomplete Only</span>
+        </button>
         <button id="exportCompleteButton">
             <span class="button-text">Export Complete Report</span>
         </button>
         <span id="exportStatus"></span>
         <span id="copyStatus"></span>
+        <span id="filterIncompleteStatus" style="margin-left: 5px; margin-right: 5px;"></span>
         <span id="exportCompleteStatus"></span>
     </div>
 
@@ -698,7 +702,12 @@
       document.querySelectorAll('button').forEach(button => {
         const buttonText = button.querySelector('.button-text');
         if (buttonText) {
-          buttonText.setAttribute('data-original-text', buttonText.textContent);
+          // Ensure filterIncompleteButton's original text is correctly captured if it's dynamic later
+          if (button.id === 'filterIncompleteButton') {
+            buttonText.setAttribute('data-original-text', "Show Incomplete Only");
+          } else {
+            buttonText.setAttribute('data-original-text', buttonText.textContent);
+          }
         }
       });
 
@@ -721,7 +730,7 @@
         showLoading(); // Global loading overlay
         clearGlobalError(); // Clear previous global errors
         // Clear all button status messages
-        ['exportStatus', 'copyStatus', 'exportCompleteStatus'].forEach(id => {
+        ['exportStatus', 'copyStatus', 'exportCompleteStatus', 'filterIncompleteStatus'].forEach(id => {
             const span = document.getElementById(id);
             if (span) {
                 span.textContent = '';
@@ -869,6 +878,102 @@
       // Add event listener for Copy Missing Dates button
       document.getElementById('copyMissingButton').addEventListener('click', handleCopyMissingDates);
 
+      // Client-side filtering for incomplete data
+      const filterIncompleteButton = document.getElementById('filterIncompleteButton');
+      let showingIncompleteOnly = false; // State variable
+
+      if (filterIncompleteButton) {
+        filterIncompleteButton.addEventListener('click', function() {
+          showingIncompleteOnly = !showingIncompleteOnly;
+          const buttonTextSpan = this.querySelector('.button-text');
+          const statusSpan = document.getElementById('filterIncompleteStatus');
+          statusSpan.textContent = ''; // Clear previous status
+          statusSpan.className = '';
+
+          // Determine active tab to get the correct table
+          const activeTabButton = document.querySelector('.tab-button.active');
+          if (!activeTabButton) return; // Should not happen
+
+          const activeTabId = activeTabButton.getAttribute('data-tab');
+          let tableBody;
+          let tableBodySelector;
+
+          if (activeTabId === 'sunday') {
+            tableBody = document.querySelector("#sunday .table-container table tbody");
+            tableBodySelector = "#sunday .table-container table tbody";
+          } else if (activeTabId === 'wednesday') {
+            tableBody = document.querySelector("#wednesday .table-container table tbody");
+            tableBodySelector = "#wednesday .table-container table tbody";
+          } else {
+            statusSpan.textContent = 'Filtering not applicable to this tab.';
+            statusSpan.className = 'status-message'; // Neutral
+            // Revert state if button was clicked on an unsupported tab
+            showingIncompleteOnly = !showingIncompleteOnly;
+            return;
+          }
+
+          if (!tableBody) {
+            statusSpan.textContent = 'Table not found for filtering.';
+            statusSpan.className = 'status-message status-error';
+            showingIncompleteOnly = !showingIncompleteOnly; // Revert state
+            return;
+          }
+
+          const rows = tableBody.getElementsByTagName('tr');
+          let visibleRowCount = 0;
+
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const centreCell = row.querySelector("td.centre-cell"); // Centre cell that might have 'missing-data' class
+
+            if (showingIncompleteOnly) {
+              if (centreCell && centreCell.classList.contains('missing-data')) {
+                row.style.display = "";
+                visibleRowCount++;
+              } else {
+                row.style.display = "none";
+              }
+            } else {
+              // When showing all, also respect the main search filter if active
+              const sundaySearchVal = document.getElementById('sundaySearchInput') ? document.getElementById('sundaySearchInput').value.toLowerCase() : "";
+              if (activeTabId === 'sunday' && sundaySearchVal !== "") {
+                  const centreName = centreCell ? centreCell.textContent.toLowerCase() : "";
+                  if (centreName.includes(sundaySearchVal)) {
+                      row.style.display = "";
+                      visibleRowCount++;
+                  } else {
+                      row.style.display = "none";
+                  }
+              } else {
+                  row.style.display = ""; // Show all if not Sunday tab with active search
+                  visibleRowCount++;
+              }
+            }
+          }
+
+          if (showingIncompleteOnly) {
+            buttonTextSpan.textContent = 'Show All Centres';
+            statusSpan.textContent = `Showing ${visibleRowCount} incomplete entries.`;
+            statusSpan.className = 'status-message';
+          } else {
+            buttonTextSpan.textContent = 'Show Incomplete Only';
+            statusSpan.textContent = 'Showing all entries.';
+             statusSpan.className = 'status-message';
+          }
+
+          if (visibleRowCount === 0 && showingIncompleteOnly) {
+             statusSpan.textContent = 'No incomplete entries found.';
+          } else if (visibleRowCount === 0 && !showingIncompleteOnly){
+            // This case should ideally be handled by the "No data" message of the table itself.
+            // statusSpan.textContent = 'No entries to display.';
+          }
+
+
+          updateSerialNumbers(tableBodySelector);
+        });
+      }
+
+
       // Function to update serial numbers for visible rows
       function updateSerialNumbers(tableBodySelector) {
         const tableBody = document.querySelector(tableBodySelector);
@@ -890,19 +995,31 @@
           const searchTerm = this.value.toLowerCase();
           const sundayTableBody = document.querySelector("#sunday .table-container table tbody");
 
+          // If "Show Incomplete Only" is active, we need to respect that filter as well
+          const filterIncompleteActive = showingIncompleteOnly;
+
           if (sundayTableBody) {
             const rows = sundayTableBody.getElementsByTagName('tr');
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
-              const centreCell = row.querySelector("td.centre-cell"); // Assumes Centre name is in a TD with this class
+              const centreCell = row.querySelector("td.centre-cell");
+              let showRow = false;
               if (centreCell) {
                 const centreName = centreCell.textContent.toLowerCase();
-                if (centreName.includes(searchTerm)) {
-                  row.style.display = "";
+                const meetsSearchCriteria = centreName.includes(searchTerm);
+                const isIncomplete = centreCell.classList.contains('missing-data');
+
+                if (filterIncompleteActive) {
+                  if (meetsSearchCriteria && isIncomplete) {
+                    showRow = true;
+                  }
                 } else {
-                  row.style.display = "none";
+                  if (meetsSearchCriteria) {
+                    showRow = true;
+                  }
                 }
               }
+              row.style.display = showRow ? "" : "none";
             }
             updateSerialNumbers("#sunday .table-container table tbody");
           }
