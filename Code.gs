@@ -159,86 +159,105 @@ function doGet(e) {
 
 /**
  * Helper function to parse a date value from the sheet's *underlying value*.
- * Prioritizes 'yyyy-MM-dd' format, then checks for JS Date object, then serial number.
+ * Prioritizes 'yyyy-MM-dd', then attempts other common formats ('dd-MM-yyyy', 'dd/MM/yyyy', 'MM/dd/yyyy'),
+ * then JS Date objects, then serial numbers. Logs warnings for non-standard formats.
  * Returns date in 'YYYY-MM-DD' format *respecting SCRIPT_TIMEZONE*, or null if invalid.
  */
-function parseDateValue(dateValue, rowIndex) {
-  let parsedDate = null;
-  const origin = `(Row ${rowIndex + 1}, Original Val: ${dateValue})`;
-  const scriptTimeZone = Session.getScriptTimeZone(); // Ensure SCRIPT_TIMEZONE is available or pass as arg
+function parseDateValue(inputValue, sheetRowIndex) {
+  let parsedDateObj = null;
+  const originalValueForLog = `(Row ${sheetRowIndex + 1}, Original Val: '${inputValue}')`;
+  const scriptTimeZone = Session.getScriptTimeZone();
 
-  // 1. Try parsing as 'yyyy-MM-dd' string
-  if (typeof dateValue === "string" && dateValue.trim() !== "") {
-    const trimmedDate = dateValue.trim();
+  const preferredFormat = "yyyy-MM-dd";
+  const alternativeFormats = ["dd-MM-yyyy", "dd/MM/yyyy", "MM/dd/yyyy"];
+
+  if (typeof inputValue === "string") {
+    const trimmedDateStr = inputValue.trim();
+    if (trimmedDateStr === "") {
+      return null; // Empty string is not a valid date
+    }
+
+    // Attempt 1: Preferred format
     try {
-      parsedDate = Utilities.parseDate(trimmedDate, scriptTimeZone, "yyyy-MM-dd");
-      if (isNaN(parsedDate.getTime())) { // Check if parsing actually succeeded
-        parsedDate = null; // Reset if parseDate didn't throw but returned invalid date
+      let d = Utilities.parseDate(trimmedDateStr, scriptTimeZone, preferredFormat);
+      if (!isNaN(d.getTime())) {
+        parsedDateObj = d;
       }
-    } catch (e) {
-      // Log error if needed, but essentially means it's not in yyyy-MM-dd
-      // Logger.log(`parseDateValue: '${trimmedDate}' is not yyyy-MM-dd. ${origin}: ${e.message}`);
-      parsedDate = null; // Ensure parsedDate is null if an error occurs
+    } catch (e) { /* Ignore parse error, try next format */ }
+
+    // Attempt 2: Alternative string formats
+    if (!parsedDateObj) {
+      for (const format of alternativeFormats) {
+        try {
+          let d = Utilities.parseDate(trimmedDateStr, scriptTimeZone, format);
+          if (!isNaN(d.getTime())) {
+            parsedDateObj = d;
+            Logger.log(`parseDateValue: Parsed date using non-standard format '${format}'. ${originalValueForLog}. Recommend changing to '${preferredFormat}' in sheet.`);
+            break;
+          }
+        } catch (e) { /* Ignore parse error, try next format */ }
+      }
     }
   }
 
-  // 2. If not parsed yet, check if it's already a JavaScript Date object
-  if (!parsedDate && dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-    parsedDate = dateValue;
-    Logger.log(`parseDateValue: Used JS Date object directly. ${origin}. Consider formatting as yyyy-MM-dd in sheet.`);
+  // Attempt 3: JavaScript Date object
+  if (!parsedDateObj && inputValue instanceof Date && !isNaN(inputValue.getTime())) {
+    parsedDateObj = inputValue;
+    Logger.log(`parseDateValue: Used JS Date object directly. ${originalValueForLog}. Recommend formatting as '${preferredFormat}' string in sheet.`);
   }
 
-  // 3. If not parsed yet, try parsing as a serial number (Excel/Sheets date number)
-  if (!parsedDate && typeof dateValue === "number" && dateValue > 0) {
-    try {
-      // Excel/Sheets epoch starts December 30, 1899 for serial numbers.
-      // Date constructor month is 0-indexed (January is 0).
-      const baseDate = new Date(1899, 11, 30); // Dec 30, 1899
-      const dateMillis = baseDate.getTime() + (dateValue * 24 * 60 * 60 * 1000);
+  // Attempt 4: Numeric serial date
+  if (!parsedDateObj && typeof inputValue === 'number' && inputValue > 0) {
+    // Basic check: very small numbers are unlikely to be valid serial dates for typical ranges.
+    // Excel serial numbers for 2000-2050 are roughly 36526 - 54786.
+    // Google Sheets might use a different base for serial numbers if not imported from Excel.
+    // This check helps avoid misinterpreting regular numbers as dates.
+    if (inputValue < 20000 && inputValue > 70000 && inputValue !== Math.floor(inputValue)) { // Heuristic: if it's not an integer or outside a broad excel range
+         Logger.log(`parseDateValue: Numeric value ${inputValue} is unlikely a serial date. ${originalValueForLog}. Skipping serial date parsing.`);
+    } else {
+        try {
+            // The common epoch for Excel serial dates is Dec 30, 1899 (for day 1 = Jan 1, 1900, due to Lotus 1-2-3 leap year bug)
+            // or sometimes Jan 1, 1904 (Mac Excel default). Utilities.formatDate can often handle serial numbers directly
+            // if the spreadsheet itself interprets them as dates, but here inputValue is a raw number.
+            const baseDate = new Date(1899, 11, 30); // For Excel Windows epoch
+            let dateMillis = baseDate.getTime() + (inputValue * 24 * 60 * 60 * 1000);
 
-      // Create a UTC date first to avoid local timezone issues with the serial number calculation itself
-      const potentialDateUTC = new Date(0);
-      potentialDateUTC.setUTCMilliseconds(dateMillis);
+            // Check if this resulted in a date far in the past or future, indicating wrong epoch or not a date
+            const tempDate = new Date(dateMillis);
+            const year = tempDate.getFullYear();
+            if (year < 1900 || year > 2100) { // Heuristic for typical date ranges
+                 // Try adjusting for potential direct milliseconds if it's a huge number (less likely from sheets)
+                if (inputValue > 1000000000000 && inputValue < 9999999999999) { // Plausible millisecond timestamp range
+                    dateMillis = inputValue;
+                     Logger.log(`parseDateValue: Interpreting numeric value as direct milliseconds. ${originalValueForLog}.`);
+                } else {
+                  throw new Error("Serial number resulted in unlikely year: " + year);
+                }
+            }
 
-      // Then, to correctly interpret this UTC date in the SCRIPT_TIMEZONE context for formatting,
-      // we may need to be careful. Utilities.formatDate handles timezone conversion.
-      // For now, let's assume the serial number directly converts to a date object
-      // whose components (year, month, day) are correct for UTC, and Utilities.formatDate will handle the rest.
-      // A more robust serial conversion might be needed if direct new Date(dateMillis) causes issues.
-      // However, the previous code's offset logic seemed to be for local timezone adjustment,
-      // which might be complex if script and sheet timezones differ.
-      // Utilities.formatDate should handle the final string in SCRIPT_TIMEZONE.
-
-      // Simpler approach: if it's a number, assume it's a valid serial date
-      // and let Utilities.formatDate handle it if it represents a valid date.
-      // The original code had an offset adjustment, which might be needed if
-      // new Date(dateMillis) is interpreted in the script's local (server) timezone
-      // before being formatted. Let's try to keep it simple first.
-      const potentialDate = new Date(dateMillis); // This will be in script's (server's) default timezone
-
-      if (!isNaN(potentialDate.getTime())) {
-         // To ensure it's treated as if it were from SCRIPT_TIMEZONE initially for conversion
-         // This is tricky. The core issue is whether the serial number itself implies a timezone
-         // or if it's just a count of days. Assuming it's a universal day count.
-         // The key is that Utilities.formatDate will correctly use SCRIPT_TIMEZONE.
-        parsedDate = potentialDate;
-        Logger.log(`parseDateValue: Parsed as serial number. ${origin}. Consider formatting as yyyy-MM-dd in sheet.`);
-      } else {
-        Logger.log(`parseDateValue: Failed to parse serial number ${dateValue} ${origin}`);
-      }
-    } catch (dateErr) {
-      Logger.log(`parseDateValue: Error parsing serial number ${dateValue} ${origin}: ${dateErr}`);
+            const potentialDate = new Date(dateMillis);
+            if (!isNaN(potentialDate.getTime())) {
+                parsedDateObj = potentialDate;
+                Logger.log(`parseDateValue: Parsed as a numeric serial date. ${originalValueForLog}. Recommend formatting as '${preferredFormat}' string in sheet.`);
+            } else {
+                Logger.log(`parseDateValue: Failed to parse serial number ${inputValue} into a valid date. ${originalValueForLog}`);
+            }
+        } catch (dateErr) {
+            Logger.log(`parseDateValue: Error parsing numeric value ${inputValue} as serial date. ${originalValueForLog}: ${dateErr.message}`);
+        }
     }
   }
 
-  // If still not parsed, and it was a string, log a general warning
-  if (!parsedDate && typeof dateValue === 'string' && dateValue.trim() !== '') {
-    Logger.log(`parseDateValue: Could not parse date string '${dateValue.trim()}'. ${origin}. Please use 'yyyy-MM-dd' format in the sheet.`);
+  // Final logging for unparsed strings
+  if (!parsedDateObj && typeof inputValue === 'string' && inputValue.trim() !== '') {
+    Logger.log(`parseDateValue: Failed to parse date string '${inputValue.trim()}' after trying all formats. ${originalValueForLog}. Please use '${preferredFormat}' or one of the supported alternative formats.`);
+  } else if (!parsedDateObj && inputValue && typeof inputValue !== 'string' && !(inputValue instanceof Date) && typeof inputValue !== 'number') {
+    Logger.log(`parseDateValue: Unparseable date value of type ${typeof inputValue}. ${originalValueForLog}.`);
   }
 
 
-  // Format valid date using SCRIPT_TIMEZONE to 'yyyy-MM-dd'
-  if (parsedDate && !isNaN(parsedDate.getTime())) {
+  // Format valid date object to 'yyyy-MM-dd' string
+  if (parsedDateObj && !isNaN(parsedDateObj.getTime())) {
     try {
       return Utilities.formatDate(parsedDate, SCRIPT_TIMEZONE, "yyyy-MM-dd");
     } catch (formatErr) {
