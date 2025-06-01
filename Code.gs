@@ -159,108 +159,85 @@ function doGet(e) {
 
 /**
  * Helper function to parse a date value from the sheet's *underlying value*.
+ * Prioritizes 'yyyy-MM-dd' format, then checks for JS Date object, then serial number.
  * Returns date in 'YYYY-MM-DD' format *respecting SCRIPT_TIMEZONE*, or null if invalid.
  */
 function parseDateValue(dateValue, rowIndex) {
   let parsedDate = null;
-  const origin = `(Row ${rowIndex + 1}, Val: ${dateValue})`;
+  const origin = `(Row ${rowIndex + 1}, Original Val: ${dateValue})`;
+  const scriptTimeZone = Session.getScriptTimeZone(); // Ensure SCRIPT_TIMEZONE is available or pass as arg
 
-  // Try Date Object
-  if (dateValue instanceof Date && !isNaN(dateValue.getTime())) {
-    parsedDate = dateValue;
-  }
-  // Try Serial Number
-  else if (typeof dateValue === "number" && dateValue > 0) {
-    try {
-      const baseDate = new Date(1899, 11, 30);
-      const dateMillis = baseDate.getTime() + dateValue * 24 * 60 * 60 * 1000;
-      const potentialDate = new Date(dateMillis);
-      const offset = potentialDate.getTimezoneOffset() * 60 * 1000;
-      const adjustedDate = new Date(dateMillis - offset);
-      if (!isNaN(adjustedDate.getTime())) {
-        parsedDate = adjustedDate;
-      } else {
-        Logger.log(`Failed serial date ${dateValue} ${origin}`);
-      }
-    } catch (dateErr) {
-      Logger.log(`Error serial date ${dateValue} ${origin}: ${dateErr}`);
-    }
-  }
-  // Try String Parsing
-  else if (typeof dateValue === "string" && dateValue.trim() !== "") {
+  // 1. Try parsing as 'yyyy-MM-dd' string
+  if (typeof dateValue === "string" && dateValue.trim() !== "") {
     const trimmedDate = dateValue.trim();
     try {
-      // Try dd-MM-yyyy format
-      let p = Utilities.parseDate(trimmedDate, SCRIPT_TIMEZONE, "dd-MM-yyyy");
-      if (!isNaN(p.getTime())) {
-        parsedDate = p;
-      } else {
-        // Try yyyy-MM-dd format
-        try {
-          p = Utilities.parseDate(trimmedDate, SCRIPT_TIMEZONE, "yyyy-MM-dd");
-          if (!isNaN(p.getTime())) {
-            parsedDate = p;
-          } else {
-            // Try dd/MM/yyyy format
-            try {
-              p = Utilities.parseDate(
-                trimmedDate,
-                SCRIPT_TIMEZONE,
-                "dd/MM/yyyy"
-              );
-              if (!isNaN(p.getTime())) {
-                parsedDate = p;
-              } else {
-                // Try MM/dd/yyyy format
-                try {
-                  p = Utilities.parseDate(
-                    trimmedDate,
-                    SCRIPT_TIMEZONE,
-                    "MM/dd/yyyy"
-                  );
-                  if (!isNaN(p.getTime())) {
-                    parsedDate = p;
-                  } else {
-                    // Try generic Date parsing
-                    try {
-                      const genericDate = new Date(trimmedDate);
-                      if (!isNaN(genericDate.getTime())) {
-                        parsedDate = genericDate;
-                      } else {
-                        Logger.log(
-                          `Failed all string parse attempts ${origin}`
-                        );
-                      }
-                    } catch (genericErr) {
-                      Logger.log(
-                        `Error generic date parsing ${trimmedDate} ${origin}: ${genericErr}`
-                      );
-                    }
-                  }
-                } catch (mmddErr) {
-                  Logger.log(
-                    `Error MM/dd/yyyy parsing ${trimmedDate} ${origin}: ${mmddErr}`
-                  );
-                }
-              }
-            } catch (ddmmErr) {
-              Logger.log(
-                `Error dd/MM/yyyy parsing ${trimmedDate} ${origin}: ${ddmmErr}`
-              );
-            }
-          }
-        } catch (yyyymmErr) {
-          Logger.log(
-            `Error yyyy-MM-dd parsing ${trimmedDate} ${origin}: ${yyyymmErr}`
-          );
-        }
+      parsedDate = Utilities.parseDate(trimmedDate, scriptTimeZone, "yyyy-MM-dd");
+      if (isNaN(parsedDate.getTime())) { // Check if parsing actually succeeded
+        parsedDate = null; // Reset if parseDate didn't throw but returned invalid date
       }
-    } catch (parseErr) {
-      Logger.log(`Error parsing string ${trimmedDate} ${origin}: ${parseErr}`);
+    } catch (e) {
+      // Log error if needed, but essentially means it's not in yyyy-MM-dd
+      // Logger.log(`parseDateValue: '${trimmedDate}' is not yyyy-MM-dd. ${origin}: ${e.message}`);
+      parsedDate = null; // Ensure parsedDate is null if an error occurs
     }
   }
 
-  // Format valid date using SCRIPT_TIMEZONE
+  // 2. If not parsed yet, check if it's already a JavaScript Date object
+  if (!parsedDate && dateValue instanceof Date && !isNaN(dateValue.getTime())) {
+    parsedDate = dateValue;
+    Logger.log(`parseDateValue: Used JS Date object directly. ${origin}. Consider formatting as yyyy-MM-dd in sheet.`);
+  }
+
+  // 3. If not parsed yet, try parsing as a serial number (Excel/Sheets date number)
+  if (!parsedDate && typeof dateValue === "number" && dateValue > 0) {
+    try {
+      // Excel/Sheets epoch starts December 30, 1899 for serial numbers.
+      // Date constructor month is 0-indexed (January is 0).
+      const baseDate = new Date(1899, 11, 30); // Dec 30, 1899
+      const dateMillis = baseDate.getTime() + (dateValue * 24 * 60 * 60 * 1000);
+
+      // Create a UTC date first to avoid local timezone issues with the serial number calculation itself
+      const potentialDateUTC = new Date(0);
+      potentialDateUTC.setUTCMilliseconds(dateMillis);
+
+      // Then, to correctly interpret this UTC date in the SCRIPT_TIMEZONE context for formatting,
+      // we may need to be careful. Utilities.formatDate handles timezone conversion.
+      // For now, let's assume the serial number directly converts to a date object
+      // whose components (year, month, day) are correct for UTC, and Utilities.formatDate will handle the rest.
+      // A more robust serial conversion might be needed if direct new Date(dateMillis) causes issues.
+      // However, the previous code's offset logic seemed to be for local timezone adjustment,
+      // which might be complex if script and sheet timezones differ.
+      // Utilities.formatDate should handle the final string in SCRIPT_TIMEZONE.
+
+      // Simpler approach: if it's a number, assume it's a valid serial date
+      // and let Utilities.formatDate handle it if it represents a valid date.
+      // The original code had an offset adjustment, which might be needed if
+      // new Date(dateMillis) is interpreted in the script's local (server) timezone
+      // before being formatted. Let's try to keep it simple first.
+      const potentialDate = new Date(dateMillis); // This will be in script's (server's) default timezone
+
+      if (!isNaN(potentialDate.getTime())) {
+         // To ensure it's treated as if it were from SCRIPT_TIMEZONE initially for conversion
+         // This is tricky. The core issue is whether the serial number itself implies a timezone
+         // or if it's just a count of days. Assuming it's a universal day count.
+         // The key is that Utilities.formatDate will correctly use SCRIPT_TIMEZONE.
+        parsedDate = potentialDate;
+        Logger.log(`parseDateValue: Parsed as serial number. ${origin}. Consider formatting as yyyy-MM-dd in sheet.`);
+      } else {
+        Logger.log(`parseDateValue: Failed to parse serial number ${dateValue} ${origin}`);
+      }
+    } catch (dateErr) {
+      Logger.log(`parseDateValue: Error parsing serial number ${dateValue} ${origin}: ${dateErr}`);
+    }
+  }
+
+  // If still not parsed, and it was a string, log a general warning
+  if (!parsedDate && typeof dateValue === 'string' && dateValue.trim() !== '') {
+    Logger.log(`parseDateValue: Could not parse date string '${dateValue.trim()}'. ${origin}. Please use 'yyyy-MM-dd' format in the sheet.`);
+  }
+
+
+  // Format valid date using SCRIPT_TIMEZONE to 'yyyy-MM-dd'
   if (parsedDate && !isNaN(parsedDate.getTime())) {
     try {
       return Utilities.formatDate(parsedDate, SCRIPT_TIMEZONE, "yyyy-MM-dd");
@@ -377,25 +354,30 @@ function getDataForDashboard(requestedMonth) {
     );
 
     // --- Process Data ---
+    const wednesdayStaticCenters = getStaticWednesdayCentersFromSheet();
+
     const sundayResult = processAndSortData(
-      sundayRows || [], // Ensure we pass an array
+      sundayRows || [],
       actualSelectedMonth,
-      true
-    ); // Pivot Sun, isSundayData = true
-    const wednesdayResult = processAndSortData(
-      wednesdayRows || [], // Ensure we pass an array
-      actualSelectedMonth,
-      false // Pivot Wed, isSundayData = false
+      true, // isSundayData = true
+      customCentreOrder // allRelevantCenters for Sunday
     );
-    const specialResultArray = processSpecialSatsangList(specialRows || []); // Ensure we pass an array
+    const wednesdayResult = processAndSortData(
+      wednesdayRows || [],
+      actualSelectedMonth,
+      false, // isSundayData = false
+      wednesdayStaticCenters // allRelevantCenters for Wednesday
+    );
+    const specialResultArray = processSpecialSatsangList(specialRows || []);
 
     return {
       sunday: sundayResult,
       wednesday: wednesdayResult,
-      special: specialResultArray, // Array
+      special: specialResultArray,
       error: null,
-      availableMonths: sortedAvailableMonths.reverse(), // Ascending for dropdown
+      availableMonths: sortedAvailableMonths.reverse(),
       selectedMonth: actualSelectedMonth,
+      staticWednesdayCentersList: wednesdayStaticCenters, // Pass this to the client if needed later
     };
   } catch (err) {
     Logger.log("Error in getDataForDashboard: " + err + " Stack: " + err.stack);
@@ -412,26 +394,21 @@ function getDataForDashboard(requestedMonth) {
 }
 
 /**
- * Helper function to pivot Sun/Wed data, calculate averages, apply custom sorting,
- * and adjust date headers +1 day for display.
+ * Helper function to pivot Sun/Wed data, calculate averages, apply custom sorting.
+ * Ensures all centers from `allRelevantCenters` are included in the output.
  * Uses ymd (in SCRIPT_TIMEZONE) for internal logic, display values for cells.
  */
-function processAndSortData(dataItems, selectedMonth, isSundayData = false) {
+function processAndSortData(dataItems, selectedMonth, isSundayData = false, allRelevantCenters = null) {
   const scriptTimeZone = Session.getScriptTimeZone();
   
-  // Early exit if dataItems is not an array or is empty
-  if (!Array.isArray(dataItems) || dataItems.length === 0) {
-    if (!isSundayData) {
-      return { templateData: [], sortedDates: [] };
-    }
-    // If it's Sunday data, we'll proceed with empty dataItems
-    dataItems = [];
-  }
+  // Initialize dataItems as an empty array if it's null or undefined, to simplify later logic
+  dataItems = dataItems || [];
+  allRelevantCenters = allRelevantCenters || [];
 
-  let processedData = {};
-  let uniqueDateInfo = {}; // Stores { "dd-MM-yyyy": "yyyy-MM-dd" }
 
-  // Process data items if they exist
+  let processedData = {}; // Holds data extracted from dataItems, keyed by centreName
+  let uniqueDateInfo = {}; // Stores { "dd-MM-yyyy_display": "yyyy-MM-dd_sortable" }
+
   dataItems.forEach((item, index) => {
     const displayRow = item.displayRow;
     const valueRow = item.valueRow;
@@ -544,59 +521,72 @@ function processAndSortData(dataItems, selectedMonth, isSundayData = false) {
   const finalTemplateData = [];
   const centresAlreadyAddedToFinal = new Set();
 
-  // If it's Sunday data, iterate through customCentreOrder first to ensure all are present
-  if (isSundayData) {
-    customCentreOrder.forEach((centreName) => {
-      const centreDataFromProcessed = processedData[centreName];
-      let isMissingData = false;
+  // Iterate through allRelevantCenters (customCentreOrder for Sunday, staticWednesdayCenters for Wednesday)
+  // This ensures all these centers appear in the output, in the specified order.
+  allRelevantCenters.forEach((centreName) => {
+    const centreDataFromProcessed = processedData[centreName];
+    let isMissingData = false;
 
-      // Check for missing data only if there are actual Sundays in the month's data
-      if (sortedDateKeys.length > 0) {
-        if (!centreDataFromProcessed) {
-          // Centre has no Sunday data entries at all this month
-          isMissingData = true;
-        } else {
-          // Check if this centre is missing data for any specific Sunday date
-          for (const dateKey of sortedDateKeys) {
-            if (!centreDataFromProcessed.dateData[dateKey]) {
-              isMissingData = true; // Missing data for at least one Sunday
-              break;
-            }
+    if (sortedDateKeys.length > 0) { // Only consider missing if there were actual dates for this event type in the month
+      if (!centreDataFromProcessed) {
+        // Centre has no data entries at all this month for this event type
+        isMissingData = true;
+      } else {
+        // Check if this centre is missing data for any specific date
+        for (const dateKey of sortedDateKeys) {
+          if (!centreDataFromProcessed.dateData[dateKey]) {
+            isMissingData = true; // Missing data for at least one event date
+            break;
           }
         }
       }
-      // If sortedDateKeys.length is 0 (no Sundays in the data for this month),
-      // then isMissingData remains false, as it's not "missing" data for a non-existent Sunday.
+    }
+    // If sortedDateKeys.length is 0 (no events of this type in the data for this month),
+    // then isMissingData remains false.
 
-      const averageSangat =
-        centreDataFromProcessed && centreDataFromProcessed.sangatCount > 0
-          ? (
-              centreDataFromProcessed.totalSangatSum /
-              centreDataFromProcessed.sangatCount
-            ).toFixed(1)
-          : "N/A";
+    const averageSangat =
+      centreDataFromProcessed && centreDataFromProcessed.sangatCount > 0
+        ? (
+            centreDataFromProcessed.totalSangatSum /
+            centreDataFromProcessed.sangatCount
+          ).toFixed(1)
+        : "N/A";
 
-      finalTemplateData.push({
-        centre: centreName,
-        isBold: boldCentres.includes(centreName),
-        dateData: centreDataFromProcessed
-          ? centreDataFromProcessed.dateData
-          : {},
-        averageSangat: averageSangat,
-        isMissingData: isMissingData, // This flag will be used for highlighting
-      });
-      centresAlreadyAddedToFinal.add(centreName);
+    finalTemplateData.push({
+      centre: centreName,
+      isBold: boldCentres.includes(centreName), // boldCentres applies to both Sun & Wed if names match
+      dateData: centreDataFromProcessed ? centreDataFromProcessed.dateData : {},
+      averageSangat: averageSangat,
+      isMissingData: isMissingData,
     });
-  }
+    centresAlreadyAddedToFinal.add(centreName);
+  });
 
-  // Add remaining centres from processedData (those not in customCentreOrder, or if not SundayData)
-  // These are centres that had data but weren't in the custom order list (if isSundayData is false, all centres fall here)
+  // Add any remaining centres from processedData that were not in allRelevantCenters
+  // These are centres that had data but weren't in the primary list.
+  // For Wednesday, this block might not run if allRelevantCenters covers all possibilities.
+  // For Sunday, this adds any centres with data not in customCentreOrder.
   Object.keys(processedData)
-    .sort((a, b) => a.localeCompare(b)) // Sort for consistent order
+    .sort((a, b) => a.localeCompare(b)) // Alphabetical sort for these additional centers
     .forEach((centreName) => {
       if (!centresAlreadyAddedToFinal.has(centreName)) {
-        // Avoid duplicating if already added via customOrder
         const centreData = processedData[centreName];
+        let isMissingDataForExtraCenter = false;
+        if (sortedDateKeys.length > 0 && centreData) {
+           for (const dateKey of sortedDateKeys) {
+            if (!centreData.dateData[dateKey]) {
+              isMissingDataForExtraCenter = true;
+              break;
+            }
+          }
+        } else if (sortedDateKeys.length > 0 && !centreData) {
+          // This case should technically be caught by the previous loop if allRelevantCenters is comprehensive
+          // or this center wasn't in processedData at all.
+          // If it means a center name was in processedData keys but object is null/undefined
+          isMissingDataForExtraCenter = true;
+        }
+
+
         const averageSangat =
           centreData.sangatCount > 0
             ? (centreData.totalSangatSum / centreData.sangatCount).toFixed(1)
@@ -606,10 +596,22 @@ function processAndSortData(dataItems, selectedMonth, isSundayData = false) {
           isBold: boldCentres.includes(centreName),
           dateData: centreData.dateData,
           averageSangat: averageSangat,
-          isMissingData: false, // Default to false for centres not in custom list or for non-Sunday data
+          // For centers not in the 'allRelevantCenters' list, 'isMissingData' logic might differ.
+          // Typically, if they have *any* data, they are not "missing" in the same sense.
+          // However, they could be missing specific dates if not all dates are filled.
+          isMissingData: isMissingDataForExtraCenter,
         });
+        centresAlreadyAddedToFinal.add(centreName); // Should not be strictly necessary here, but good practice
       }
     });
+
+  // If after all processing, for a day type with allRelevantCenters defined,
+  // and no data items were found at all (dataItems was empty),
+  // but there are sortedDateKeys (which implies some data existed somewhere for this month for this day type,
+  // though this scenario is unlikely if dataItems is empty for this specific call),
+  // the isMissingData flag would have been set.
+  // If dataItems is empty AND sortedDateKeys is empty, finalTemplateData will list allRelevantCenters
+  // with N/A averages and isMissingData = false, which is correct.
 
   return {
     templateData: finalTemplateData,
@@ -1209,20 +1211,64 @@ function changeMonth(newMonth) {
 }
 
 /**
- * Exports complete data with all columns in the same format as the web app
+ * Retrieves a list of static Wednesday center names from the "Configuration" sheet.
+ * Assumes center names are in the first column (Column A), starting from row 1 or 2.
+ * @return {Array<string>} An array of center names. Returns empty if sheet/data not found.
+ */
+function getStaticWednesdayCentersFromSheet() {
+  const configSheetName = "Configuration";
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(configSheetName);
+
+  if (!sheet) {
+    Logger.log(`Error: Sheet "${configSheetName}" not found. Cannot retrieve static Wednesday centers.`);
+    return [];
+  }
+
+  try {
+    // Get data from the first column. getLastRow might be too much if the column is sparsely populated
+    // but other columns have more data. Range up to where data exists in column A.
+    const lastRowWithDataInColA = sheet.getRange("A1:A").getValues().filter(String).length;
+    if (lastRowWithDataInColA === 0) {
+      Logger.log(`No data found in column A of "${configSheetName}" sheet.`);
+      return [];
+    }
+
+    const range = sheet.getRange(1, 1, lastRowWithDataInColA); // Column A, down to the last row with content in A
+    const values = range.getValues();
+    const centers = values.map(row => row[0].toString().trim()).filter(name => name !== "");
+
+    Logger.log(`Retrieved ${centers.length} static Wednesday centers from "${configSheetName}": ${centers.join(", ")}`);
+    return centers;
+  } catch (e) {
+    Logger.log(`Error reading static Wednesday centers from "${configSheetName}": ${e.message} Stack: ${e.stack}`);
+    return [];
+  }
+}
+
+
+/**
+ * Finds missing date entries for Sunday and Wednesday satsangs for a given month.
+ * Returns an array of objects, each detailing the center, day, and missing dates.
  */
 function findMissingDateEntries(selectedMonth) {
   const scriptTimeZone = Session.getScriptTimeZone();
   const currentMonth =
     selectedMonth ||
     Utilities.formatDate(new Date(), scriptTimeZone, "yyyy-MM");
-  const processedDataResult = getDataForDashboard(currentMonth);
+
+  // Pass null for sundaySortPref as it's not relevant for missing date calculation here
+  const processedDataResult = getDataForDashboard(currentMonth, null);
 
   if (processedDataResult.error) {
+    Logger.log(`Error in findMissingDateEntries while fetching dashboard data: ${processedDataResult.error}`);
+    // Depending on how you want to handle this, you might throw an error
+    // or return an empty array or an array with an error object.
+    // For now, let's throw, so the client-side gets a failure.
     throw new Error(processedDataResult.error);
   }
 
-  const results = [];
+  const results = []; // Will store objects: { centerName: string, day: string, dates: string[] }
 
   // Check Sundays
   const sundayResult = processedDataResult.sunday;
@@ -1231,46 +1277,64 @@ function findMissingDateEntries(selectedMonth) {
     sundayResult.templateData &&
     sundayResult.templateData.length > 0
   ) {
-    const sundayDates = sundayResult.sortedDates || [];
-    sundayResult.templateData.forEach((center) => {
-      const centerName = center.centre;
-      const missingDates = sundayDates.filter((date) => !center.dateData[date]);
-      if (missingDates.length > 0) {
-        results.push(`${centerName} (Sunday): ${missingDates.join(", ")}`);
-      }
-    });
+    const sundayDates = sundayResult.sortedDates || []; // These are 'dd-MM-yyyy'
+    if (sundayDates.length > 0) { // Only proceed if there were Sundays this month
+      sundayResult.templateData.forEach((center) => {
+        // The `isMissingData` flag on `center` object (if populated by processAndSortData)
+        // already tells us if this center is missing *any* Sunday.
+        // However, to get the *specific* missing dates, we still need to check.
+        const centerName = center.centre;
+        const missingDates = sundayDates.filter((date) => !center.dateData[date]);
+        if (missingDates.length > 0) {
+          results.push({ centerName: centerName, day: "Sunday", dates: missingDates });
+        }
+      });
+    }
   }
 
   // Check Wednesdays
   const wednesdayResult = processedDataResult.wednesday;
-  const staticWednesdayCenters = [
-    "ALWAR", "ALWAR-2", "BEHROR", "BHIWADI", "CHIKANI", "FATEHPUR", "GOBINDGARH",
-    "HALDEENA", "HAZIPUR", "JHALATALA", "KARANA", "KARNIKOT", "KHAIRTHAL",
-    "KISHANGARH BAS", "LAXMANGARH", "MUBARIKPUR", "PAWTI", "PEPEAL KHERA",
-    "RAJGARH", "RAMGARH", "RATA KHURD", "SHAJHANPUR"
-  ];
-  if (
+  // Get static list from Configuration sheet
+  const staticWednesdayCenters = getStaticWednesdayCentersFromSheet();
+
+  if (staticWednesdayCenters.length === 0) {
+    Logger.log("findMissingDateEntries: No static Wednesday centers configured. Skipping Wednesday check.");
+  } else if (
     wednesdayResult &&
     wednesdayResult.sortedDates &&
     wednesdayResult.sortedDates.length > 0
   ) {
-    const wednesdayDates = wednesdayResult.sortedDates || [];
+    const wednesdayDates = wednesdayResult.sortedDates || []; // These are 'dd-MM-yyyy'
+
     staticWednesdayCenters.forEach(centerName => {
-      // Find the center in the data
-      const center = (wednesdayResult.templateData || []).find(row => row.centre === centerName);
-      let missingDates = [];
-      if (!center) {
-        // If the center has no data at all, all dates are missing
-        missingDates = wednesdayDates.slice();
+      // Find the center in the data returned by getDataForDashboard.
+      // processAndSortData should now ensure all staticWednesdayCenters are in templateData.
+      const centerData = (wednesdayResult.templateData || []).find(row => row.centre === centerName);
+      let missingDatesForThisCenter = [];
+
+      if (!centerData) {
+        // This case should ideally not happen if processAndSortData correctly includes all static centers.
+        // If it does, it means the center had no data entries at all.
+        Logger.log(`findMissingDateEntries: Center '${centerName}' not found in Wednesday processed data. Assuming all dates missing.`);
+        missingDatesForThisCenter = wednesdayDates.slice(); // All dates are missing
       } else {
-        // Otherwise, check which dates are missing
-        missingDates = wednesdayDates.filter(date => !center.dateData[date]);
+        // Check which specific dates are missing for this center
+        missingDatesForThisCenter = wednesdayDates.filter(date => !centerData.dateData[date]);
       }
-      if (missingDates.length > 0) {
-        results.push(`${centerName} (Wednesday): ${missingDates.join(", ")}`);
+
+      if (missingDatesForThisCenter.length > 0) {
+        results.push({ centerName: centerName, day: "Wednesday", dates: missingDatesForThisCenter });
       }
     });
+  } else if (staticWednesdayCenters.length > 0 && wednesdayResult && wednesdayResult.sortedDates && wednesdayResult.sortedDates.length === 0) {
+    // Static centers exist, but no Wednesday satsangs were reported at all in the month.
+    // This means all static centers are "missing" all potential Wednesdays (if any were expected).
+    // However, without any `wednesdayResult.sortedDates`, there are no dates to report as missing.
+    // This state is more "No Wednesday data this month" rather than specific missing entries.
+    // So, we don't add anything to results here. The client can show "No data".
+    Logger.log("findMissingDateEntries: Static Wednesday centers exist, but no Wednesday dates found in data for the month.");
   }
+
 
   return results;
 }

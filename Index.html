@@ -547,19 +547,48 @@
 
         <!-- Sunday Satsangs Tab -->
         <div id="sunday" class="tab-content active">
+            <div class="table-controls" style="margin-bottom: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 6px;">
+              <label for="sundaySearchInput" style="margin-right: 5px; font-weight: 500;">Search Centre:</label>
+              <input type="text" id="sundaySearchInput" placeholder="Type to search..." style="padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 250px;">
+            </div>
             <? generatePivotedTable('Sunday Satsangs', sundayData, sundayData ? sundayData.sortedDates : [], eventDetailHeaders, eventDetailKeys, selectedMonth); ?>
         </div>
 
         <!-- Wednesday Satsangs Tab -->
         <div id="wednesday" class="tab-content">
-            <? if (wednesdayData && wednesdayData.sortedDates && wednesdayData.sortedDates.length > 0) {
-                var staticWednesdayCenters = [
-                    "ALWAR", "ALWAR-2", "BEHROR", "BHIWADI", "CHIKANI", "FATEHPUR", "GOBINDGARH",
-                    "HALDEENA", "HAZIPUR", "JHALATALA", "KARANA", "KARNIKOT", "KHAIRTHAL",
-                    "KISHANGARH BAS", "LAXMANGARH", "MUBARIKPUR", "PAWTI", "PEPEAL KHERA",
-                    "RAJGARH", "RAMGARH", "RATA KHURD", "SHAJHANPUR"
-                ];
+            <?
+            // _displayMonth is already prepared at the top of the HTML for "No data" messages.
+            // wednesdayData.templateData is now prepared by Code.gs to include all static centers.
+            // wednesdayData.sortedDates contains the actual dates for which data was reported in the month.
             ?>
+            <? if (!wednesdayData || !wednesdayData.templateData || wednesdayData.templateData.length === 0) { ?>
+                <div class="no-data">No Wednesday satsang data available for <?= _displayMonth ?>.</div>
+            <? } else if (!wednesdayData.sortedDates || wednesdayData.sortedDates.length === 0) { ?>
+                <div class="no-data">No Wednesday satsangs were scheduled or reported for <?= _displayMonth ?>. All configured centers are listed below.</div>
+                <!-- Still render the table structure but without date columns if templateData exists -->
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="sn-header">S.N.</th>
+                                <th class="avg-header">Avg Sangat</th>
+                                <th class="centre-header">Centre/Subcentre</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <? for (var i = 0; i < wednesdayData.templateData.length; i++) {
+                                var centreRow = wednesdayData.templateData[i];
+                            ?>
+                                <tr>
+                                    <td class="sn-cell"><?= i + 1 ?></td>
+                                    <td class="avg-cell"><?= centreRow.averageSangat ?></td>
+                                    <td class="centre-cell <?= centreRow.isBold ? 'bold-centre' : '' ?> <?= centreRow.isMissingData ? 'missing-data' : '' ?>"><?= centreRow.centre ?></td>
+                                </tr>
+                            <? } ?>
+                        </tbody>
+                    </table>
+                </div>
+            <? } else { ?>
                 <div class="table-container">
                     <table>
                         <thead>
@@ -580,33 +609,20 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <? for (var i = 0; i < staticWednesdayCenters.length; i++) {
-                                var centreName = staticWednesdayCenters[i];
-                                var centreRow = (wednesdayData.templateData || []).find(function(row) { return row.centre === centreName; });
-                                var isMissing = false;
-                                if (!centreRow) {
-                                    isMissing = true;
-                                } else {
-                                    for (var d = 0; d < wednesdayData.sortedDates.length; d++) {
-                                        var dateKey = wednesdayData.sortedDates[d];
-                                        if (!centreRow.dateData[dateKey]) {
-                                            isMissing = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                            <? for (var i = 0; i < wednesdayData.templateData.length; i++) {
+                                var centreRow = wednesdayData.templateData[i];
+                                // The isMissingData flag is now set by Code.gs
                             ?>
                                 <tr>
                                     <td class="sn-cell"><?= i + 1 ?></td>
-                                    <td class="avg-cell"><?= !centreRow ? '' : centreRow.averageSangat ?></td>
-                                    <td class="centre-cell<?= isMissing ? ' missing-data' : (centreRow && centreRow.isBold ? ' bold-centre' : '') ?>"><?= centreName ?></td>
+                                    <td class="avg-cell"><?= centreRow.averageSangat ?></td>
+                                    <td class="centre-cell <?= centreRow.isBold ? 'bold-centre' : '' ?> <?= centreRow.isMissingData ? 'missing-data' : '' ?>"><?= centreRow.centre ?></td>
                                     <? for (var d = 0; d < wednesdayData.sortedDates.length; d++) {
                                         var dateKey = wednesdayData.sortedDates[d];
-                                        var eventDataForDate = !centreRow ? {} : (centreRow.dateData[dateKey] || {});
+                                        var eventDataForDate = centreRow.dateData[dateKey] || {}; // Default to empty object if no data for this specific date
                                         eventDetailKeys.forEach(function(colKey, index) {
                                             var displayValue = eventDataForDate[colKey];
                                             displayValue = (displayValue === null || displayValue === undefined) ? '' : displayValue;
-                                            // Add separator only before Total Sangat column
                                             var isTotalSangatColumn = eventDetailHeaders[index] === 'Total Sangat';
                                     ?>
                                         <td class="<?= isTotalSangatColumn ? 'date-separator' : '' ?>"><?= displayValue ?></td>
@@ -616,8 +632,6 @@
                         </tbody>
                     </table>
                 </div>
-            <? } else { ?>
-                <div class="no-data">No Wednesday satsang data available for <?= selectedMonth ?>.</div>
             <? } ?>
         </div>
 
@@ -704,21 +718,38 @@
 
       // Month change handler with loading state
       document.getElementById('monthSelector').addEventListener('change', function() {
-        showLoading();
+        showLoading(); // Global loading overlay
+        clearGlobalError(); // Clear previous global errors
+        // Clear all button status messages
+        ['exportStatus', 'copyStatus', 'exportCompleteStatus'].forEach(id => {
+            const span = document.getElementById(id);
+            if (span) {
+                span.textContent = '';
+                span.className = ''; // Reset class to remove status styling
+            }
+        });
+        // Clear Sunday search input
+        const sundaySearch = document.getElementById('sundaySearchInput');
+        if (sundaySearch) {
+            sundaySearch.value = '';
+            // Optionally trigger filter to reset view, though page reload will handle it
+        }
+
+
         const selectedMonth = this.value;
         
         google.script.run
           .withSuccessHandler(function(result) {
             hideLoading();
             if (result.error) {
-              showError(result.error);
+              showError(result.error); // Show new global error if any from server logic
             } else {
-              location.reload();
+              location.reload(); // Reload page to reflect new month's data
             }
           })
           .withFailureHandler(function(error) {
             hideLoading();
-            showError('Failed to change month: ' + error.message);
+            showError(error); // Show global error on failure to change month
           })
           .changeMonth(selectedMonth);
       });
@@ -729,6 +760,10 @@
         const statusSpan = document.getElementById(statusId);
         const selectedMonth = document.getElementById('monthSelector').value;
         
+        // Clear previous status for this specific button
+        statusSpan.textContent = '';
+        statusSpan.className = ''; // Reset class
+
         if (!selectedMonth) {
           statusSpan.textContent = 'Please select a month first.';
           statusSpan.className = 'status-message status-error';
@@ -737,7 +772,7 @@
 
         setButtonLoading(buttonId, true);
         statusSpan.textContent = 'Preparing export...';
-        statusSpan.className = 'status-message';
+        statusSpan.className = 'status-message'; // Neutral class while loading
 
         google.script.run
           .withSuccessHandler(function(downloadUrl) {
@@ -747,31 +782,17 @@
               statusSpan.className = 'status-message status-success';
               window.open(downloadUrl, '_blank');
             } else {
-              statusSpan.textContent = 'Export completed but no download URL received.';
-              statusSpan.className = 'status-message status-error';
+              // This case might mean no data to export, or an issue generating the URL server-side without throwing an error.
+              statusSpan.textContent = 'Export completed, but no download URL was provided. This may happen if there is no data for the selected month or criteria.';
+              statusSpan.className = 'status-message'; // Use neutral for this, or status-error if preferred
             }
           })
           .withFailureHandler(function(error) {
             setButtonLoading(buttonId, false);
-            let errorMessage = 'Export failed: ';
-            
-            if (error.message.includes('Service Spreadsheets failed')) {
-              errorMessage = 'Data processing error. Please check for:\n' +
-                           '1. Invalid characters in the data\n' +
-                           '2. Cells with unusual formatting\n' +
-                           '3. Very large numbers or text\n' +
-                           'Try cleaning the data and exporting again.';
-            } else if (error.message.includes('timed out')) {
-              errorMessage = 'The data is too large to process. Please try exporting a smaller range.';
-            } else if (error.message.includes('permission')) {
-              errorMessage = 'Permission denied. Please check your Google account permissions and try again.';
-            } else {
-              errorMessage += error.message;
-            }
-            
-            statusSpan.textContent = errorMessage;
+            const userErrorMessage = getUserFriendlyErrorMessage(error);
+            statusSpan.textContent = userErrorMessage;
             statusSpan.className = 'status-message status-error';
-            console.error('Export Error:', error);
+            console.error('Export Error (' + exportFunction + '):', error);
           })
           [exportFunction](selectedMonth);
       }
@@ -783,18 +804,174 @@
       document.getElementById('exportCompleteButton').addEventListener('click', () => 
         handleExport('exportCompleteButton', 'exportCompleteStatus', 'exportCompleteDataToExcel'));
 
-      // Error handling
-      function showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'status-message status-error';
-        errorDiv.innerHTML = `
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
-          </svg>
-          ${message}
-        `;
-        document.querySelector('.controls').after(errorDiv);
-        setTimeout(() => errorDiv.remove(), 5000);
+      // Handler for Copy Missing Dates button
+      function handleCopyMissingDates() {
+        const buttonId = 'copyMissingButton';
+        const statusId = 'copyStatus';
+        const statusSpan = document.getElementById(statusId);
+        const selectedMonth = document.getElementById('monthSelector').value;
+
+        // Clear previous status for this specific button
+        statusSpan.textContent = '';
+        statusSpan.className = '';
+
+
+        if (!selectedMonth) {
+          statusSpan.textContent = 'Please select a month first.';
+          statusSpan.className = 'status-message status-error';
+          return;
+        }
+
+        setButtonLoading(buttonId, true);
+        statusSpan.textContent = 'Finding missing dates...';
+        statusSpan.className = 'status-message'; // Neutral class while loading
+
+        google.script.run
+          .withSuccessHandler(function(results) {
+            setButtonLoading(buttonId, false);
+            if (results && results.length > 0) {
+              let formattedResults = "";
+              results.forEach(item => {
+                formattedResults += `${item.centerName} (${item.day}): ${item.dates.join(', ')}\n`;
+              });
+
+              const textArea = document.createElement('textarea');
+              textArea.value = formattedResults;
+              document.body.appendChild(textArea);
+              textArea.select();
+              try {
+                document.execCommand('copy');
+                statusSpan.textContent = 'Missing dates copied to clipboard!';
+                statusSpan.className = 'status-message status-success';
+              } catch (err) {
+                console.error('Error copying to clipboard:', err);
+                const userErrorMessage = getUserFriendlyErrorMessage(err); // Use helper for clipboard error too
+                statusSpan.textContent = 'Failed to copy to clipboard. ' + userErrorMessage;
+                statusSpan.className = 'status-message status-error';
+              }
+              document.body.removeChild(textArea);
+
+            } else {
+              statusSpan.textContent = 'No missing dates found for the selected month.';
+              statusSpan.className = 'status-message'; // Neutral, not an error
+            }
+          })
+          .withFailureHandler(function(error) {
+            setButtonLoading(buttonId, false);
+            const userErrorMessage = getUserFriendlyErrorMessage(error);
+            statusSpan.textContent = userErrorMessage;
+            statusSpan.className = 'status-message status-error';
+            console.error('Error finding missing dates:', error);
+          })
+          .findMissingDateEntries(selectedMonth);
+      }
+
+      // Add event listener for Copy Missing Dates button
+      document.getElementById('copyMissingButton').addEventListener('click', handleCopyMissingDates);
+
+      // Function to update serial numbers for visible rows
+      function updateSerialNumbers(tableBodySelector) {
+        const tableBody = document.querySelector(tableBodySelector);
+        if (!tableBody) return;
+
+        const visibleRows = tableBody.querySelectorAll("tr:not([style*='display: none'])");
+        visibleRows.forEach((row, index) => {
+          const snCell = row.querySelector("td.sn-cell"); // Assuming S.N cell has class 'sn-cell'
+          if (snCell) {
+            snCell.textContent = index + 1;
+          }
+        });
+      }
+
+      // Event listener for Sunday Search Input
+      const sundaySearchInput = document.getElementById('sundaySearchInput');
+      if (sundaySearchInput) {
+        sundaySearchInput.addEventListener('input', function() {
+          const searchTerm = this.value.toLowerCase();
+          const sundayTableBody = document.querySelector("#sunday .table-container table tbody");
+
+          if (sundayTableBody) {
+            const rows = sundayTableBody.getElementsByTagName('tr');
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i];
+              const centreCell = row.querySelector("td.centre-cell"); // Assumes Centre name is in a TD with this class
+              if (centreCell) {
+                const centreName = centreCell.textContent.toLowerCase();
+                if (centreName.includes(searchTerm)) {
+                  row.style.display = "";
+                } else {
+                  row.style.display = "none";
+                }
+              }
+            }
+            updateSerialNumbers("#sunday .table-container table tbody");
+          }
+        });
+      }
+
+      // Generic utility to get user-friendly error messages
+      function getUserFriendlyErrorMessage(error) {
+        let message = "An unexpected error occurred. Please try again later.";
+        if (error && error.message) {
+          // Apps Script specific errors often have "Exception:" or "ScriptError:" prefix
+          let detailedMessage = error.message.replace(/^Exception: /i, "").replace(/^ScriptError: /i, "");
+
+          if (detailedMessage.includes("Timed out")) {
+            message = "The operation timed out. The server may be busy or the request took too long. Please try again.";
+          } else if (detailedMessage.match(/not found/i) || detailedMessage.match(/getSheetByName/i)) {
+            message = "A required resource (e.g., a sheet or configuration) was not found. Please check your spreadsheet setup. Details: " + detailedMessage;
+          } else if (detailedMessage.includes("Service Spreadsheets failed")) {
+            message = "A data processing error occurred with Google Sheets. This could be due to issues like invalid characters in your data, unusual cell formatting, or very large numbers/text. Details: " + detailedMessage;
+          } else if (detailedMessage.match(/permission/i) || detailedMessage.match(/access denied/i)) {
+            message = "Permission denied. Please ensure the script has the necessary permissions and check your Google account. Details: " + detailedMessage;
+          } else if (detailedMessage.trim().length > 0) {
+            message = "Error: " + detailedMessage;
+          }
+        } else if (typeof error === 'string' && error.trim().length > 0) {
+          message = error; // If error is just a non-empty string
+        }
+        return message;
+      }
+
+      // Global error display (for non-button specific errors like month change)
+      function showError(error) { // Accepts error object or string
+        const message = getUserFriendlyErrorMessage(error);
+        const existingErrorDiv = document.getElementById('globalErrorDiv');
+        if (existingErrorDiv) {
+          existingErrorDiv.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
+            </svg>
+            ${message}
+          `;
+          existingErrorDiv.style.display = 'flex'; // Make sure it's visible
+        } else {
+          const errorDiv = document.createElement('div');
+          errorDiv.id = 'globalErrorDiv';
+          errorDiv.className = 'status-message status-error'; // It's always an error
+          errorDiv.style.display = 'flex';
+          errorDiv.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="currentColor"/>
+            </svg>
+            ${message}
+          `;
+          // Insert after the .controls div, or a more specific location if desired
+          const controlsDiv = document.querySelector('.controls');
+          if (controlsDiv && controlsDiv.parentNode) {
+            controlsDiv.parentNode.insertBefore(errorDiv, controlsDiv.nextSibling);
+          } else { // Fallback if .controls is not found
+            document.body.insertBefore(errorDiv, document.body.firstChild);
+          }
+        }
+      }
+
+      function clearGlobalError() {
+        const existingErrorDiv = document.getElementById('globalErrorDiv');
+        if (existingErrorDiv) {
+          existingErrorDiv.style.display = 'none';
+          existingErrorDiv.innerHTML = ''; // Clear content
+        }
       }
 
       // Add error handling for script loading
